@@ -1,0 +1,6 @@
+{
+  "components": [
+    "spark-worker": "in-pod",
+    "spark-master": "in-pod"
+  ]
+}

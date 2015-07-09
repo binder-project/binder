@@ -1,0 +1,18 @@
+{
+  "containers": [
+  {
+    "name": "spark-worker",
+    "image": "andrewosh/spark-worker",
+    "ports": [
+      {
+        "hostPort": 8888,
+        "containerPort": 8888
+      }
+    ],
+    "resources": {
+      "limits": {
+        "cpu": "100m"
+      }
+    }
+  }]
+}

@@ -1,0 +1,25 @@
+{
+  "containers": [
+  {
+    "name": "spark-master",
+    "image": "andrewosh/spark-master",
+    "command": [
+      "start-master.sh"
+    ],
+    "ports": [
+      {
+        "name": "master_port",
+        "containerPort": {{master_port}}
+      },
+      {
+        "name": "web_ui_port",
+        "containerPort": {{web_ui_port}}
+      }
+    ],
+    "resources": {
+      "limits": {
+        "cpu": "100m"
+      }
+    }
+  }]
+}

@@ -1,0 +1,21 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": {{service_name}},
+    "labels": {
+      "name": {{service_name}}
+    }
+  },
+  "spec": {
+    "ports": [
+      {
+        "port": {{service_port}},
+        "targetPort": {{pod_port}}
+      }
+    ],
+    "selector": {
+      "name": {{service_selector}}
+    }
+  }
+}

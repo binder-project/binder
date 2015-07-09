@@ -1,0 +1,15 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": {{project_name}},
+    "labels": {
+      "name": {{project_name}}
+    }
+  },
+  "spec": {
+    "containers": [
+      {{containers}}
+    ]
+  }
+}

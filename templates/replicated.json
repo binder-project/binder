@@ -1,0 +1,26 @@
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": {{controller_name}},
+    "labels": {
+      "name": {{controller_name}}
+    }
+  },
+  "spec": {
+    "replicas": {{num_replicas}},
+    "selector": {
+      "name": {{controller_name}}
+    },
+    "template": {
+      "metadata":{
+        "labels": {
+          "name": {{controller_name}}
+        }
+      },
+      "spec": { 
+        {{containers}}
+      }
+    }
+  }
+}

@@ -1,0 +1,161 @@
+@import url(http://fonts.googleapis.com/css?family=Abel);
+@import url(http://fonts.googleapis.com/css?family=Lato);
+
+/* GLOBALS */
+body {background-color: white;}
+
+/* INTRO PAGE */
+.toolbar_info, .list-container {color: black;}
+
+/* NOTEBOOK */
+div#maintoolbar {display: none !important;}
+
+div#notebook {border-top: none;}
+div#notebook-container {box-shadow: none; -webkit-box-shadow: none; padding: 20px; border-radius: 5px;}
+
+.item_name {color: rgb(80,80,100);}
+.item_name:hover {color: rgb(20,20,30);}
+
+.notebook_app div#header {box-shadow: none; -webkit-box-shadow: none;}
+.notebook_app {background-color: rgb(234, 234, 242);}
+
+div.input_prompt {color: rgb(168, 168, 176);}
+div.output_prompt {color: #4f5b66;}
+div.input_area {
+  border-radius: 4px;
+  border: none;
+  background-color: rgb(234, 234, 242);
+  padding: 2px;
+}
+div.output_area pre {font-weight: normal; color: #4f5b66;}
+div.output_subarea {font-weight: normal; color: #4f5b66;}
+
+div.cell.selected {border-radius: 4px; border-color: white; border-left: 7px solid rgb(232,232,242); background: none; margin-left: -6px;}
+div.cell {margin-bottom: 5px; border-left: 7px solid white; margin-left: -6px;}
+
+.edit_mode div.cell.selected {border-radius: 4px; border-color: white; border-left: 7px solid rgb(212,212,222); margin-left: -6px;}
+
+div#menus {background: none; border: none;}
+
+
+a {
+  font-size: 16px;
+  font-family: 'Abel';
+  text-decoration: none !important;
+  transition: all .25s; 
+  -moz-transition: all .25s; 
+  -webkit-transition: all .25s;
+}
+
+.call-link {
+  font-size: 24px;
+  border-bottom: 2px dotted rgb(80,80,80);
+  color: rgb(69, 133, 255);
+}
+
+.call-link:hover {
+  color: rgb(59, 90, 150);
+}
+
+.call-link:focus {
+  color: rgb(69, 133, 255);
+}
+
+.call-link.thunder {
+  color: rgb(235,139,52);
+}
+
+.call-link.thunder:hover {
+  color: rgb(200,110,52);
+}
+
+.call-link.thunder:focus {
+  color: rrgb(235,139,52);
+}
+
+.call-link.datasets {
+  color: rgb(238,112,71);
+}
+
+.call-link.datasets:hover {
+  color: rgb(210,80,52);
+}
+
+.call-link.datasets:focus {
+  color: rgb(238,112,71);
+}
+
+.call-link.neurofinder {
+  color: rgb(43,182,115);
+}
+
+.call-link.neurofinder:hover {
+  color: rgb(30,150,80);
+}
+
+.call-link.neurofinder:focus {
+  color: rgb(43,182,115);
+}
+
+
+/* WELCOME PAGES */
+.button-link {
+  color: white;
+}
+
+.button {
+  padding-left: 40px;
+  padding-right: 40px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  margin-right: 20px;
+  background-color: rgb(69, 133, 255);
+  border: 3px solid rgb(69, 133, 255);
+  border-radius: 6px;
+  font-size: 28px;
+  line-height: 26px;
+  font-style: italic;
+}
+
+.button:hover {
+  color: rgb(69, 133, 255);
+  border: 3px dotted rgb(69, 133, 255);
+  background-color: white
+}
+
+.button:active {
+  color: white;
+}
+
+.button-link:active {
+  color: white;
+}
+
+.button-link:focus {
+  color: white;
+}
+
+.button:focus {
+  color: white;
+}
+
+.info-text {
+  font-size: 24px; 
+  font-family: 'Abel'; 
+  line-height: 30px;
+  max-width: 750px;
+}
+
+.header-1 {
+  font-family: Abel; 
+  font-size:48px; 
+  font-weight:100;
+  margin-bottom: 48px;
+}
+
+.header-2 {
+  font-family:Abel; 
+  font-size:36px; 
+  font-weight:800;
+  margin-bottom: 36px;
+}
