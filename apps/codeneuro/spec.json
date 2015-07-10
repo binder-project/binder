@@ -7,11 +7,12 @@
   "requirements": [
     "requirements.txt"
   ],
+  "notebooks": "notebooks",
   "modules": [
     {
       "name": "spark",
+      "version": "1.3.1",
       "params": {
-        "version": "1.3.1",
         "heap_mem": "4g",
         "stack_mem": "512m"
       }

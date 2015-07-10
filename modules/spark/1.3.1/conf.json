@@ -1,7 +1,7 @@
 {
   "parameters": {
     "master_port": "7077",
-    "web_ui_port": 8080,
+    "web_ui_port": "8080",
     "app_ui_port": "4040"
   },
   "images":[
