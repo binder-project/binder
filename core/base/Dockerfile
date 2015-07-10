@@ -8,9 +8,7 @@ MAINTAINER Andrew Osheroff <andrewosh@gmail.com>
 
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN apt-get update
-
-RUN apt-get update && apt-get install -y git vim wget build-essential python2.7-dev ca-certificates bzip2 libsm6 && apt-get clean
+RUN apt-get update && apt-get install -y git vim wget build-essential python-dev ca-certificates bzip2 libsm6 && apt-get clean
 
 # We run our docker images with a non-root user as a security precaution.
 # main is our user
@@ -24,21 +22,24 @@ ENV SHELL /bin/bash
 ENV USER main
 WORKDIR $HOME
 
-USER main
+USER root
 
 RUN apt-get install -y python-pip ipython gcc
-RUN pip install --yes ipython 
-RUN pip install ipython-notebook 
 
-RUN ipython profile create
+RUN pip install ipython[all]
+RUN pip install --upgrade ipython[notebook]
 
-# Workaround for issue with ADD permissions
-USER root
+USER main
+
 ADD profile_default /home/main/.ipython/profile_default
 ADD templates/ /srv/templates/
+
+USER root
 RUN chmod a+rX /srv/templates
-RUN chown main:main /home/main -R
+RUN chown -R main:main /home/main
 USER main
+
+RUN ipython profile create
 
 # Convert notebooks to the current format
 RUN find . -name '*.ipynb' -exec ipython nbconvert --to notebook {} --output {} \;

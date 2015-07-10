@@ -1,13 +1,8 @@
 {
   "name": "codeneuro-notebooks",
-  "root": "./repo",
-  "config_scripts": [
-    ".travis.yml"
-  ],
-  "requirements": [
-    "requirements.txt"
-  ],
-  "notebooks": "notebooks",
+  "root": "repo",
+  "requirements": "repo/requirements.txt",
+  "notebooks": "repo/notebooks",
   "modules": [
     {
       "name": "spark",

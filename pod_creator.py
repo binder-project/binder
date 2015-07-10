@@ -18,14 +18,13 @@ Utilities
 
 def fill_template(template_path, params):
     try:
-        res = [(re.compile("{{" + k + "}}"), params[k]) for k in params.keys()]
+        res = [(re.compile("{{" + k + "}}"), params[k]) for k in params if isinstance(params[k], basestring)]
         with open(template_path, 'r+') as template:
             raw = template.read()
         with open(template_path, 'w') as template:
             replaced = raw
             for pattern, new in res:
                 replaced = pattern.sub(new, replaced)
-            print "replaced: {0}".format(replaced, raw)
             template.write(replaced)
     except (IOError, TypeError) as e:
         print("Could not fill template {0}: {1}".format(template_path, e))
@@ -114,7 +113,7 @@ class FileAppIndex(AppIndex):
     APP_DIR = "apps"
 
     def __init__(self, root):
-        app_dir = os.path.join(root, self.APP_DIR)
+        self.app_dir = os.path.join(root, self.APP_DIR)
 
     def find_apps(self):
         apps = {}
@@ -160,6 +159,8 @@ class App(object):
         self.requirements = self._json.get("requirements")
         self.repo = os.path.join(self.path, self._json.get("root"))
 
+        self.build_time = 0
+
     def build(self):
         success = True
 
@@ -170,21 +171,24 @@ class App(object):
             os.mkdir(build_path)
 
         # ensure that the module dependencies are all build
+        print "Building module dependencies..."
         for mod_json in self.modules:
             module = Module.get_module(mod_json["name"], mod_json["version"])
             module.build()
 
         # copy new file and replace all template placeholders with parameters
+        print "Copying files and filling templates..."
         core_images_path = os.path.join(ROOT, "core")
         for img in os.listdir(core_images_path):
             img_path = os.path.join(core_images_path, img)
             bd_path = os.path.join(build_path, img)
             shutil.copytree(img_path, bd_path)
-            for root, dirs, files in os.walk(os.path.join(build_path, bd)):
+            for root, dirs, files in os.walk(bd_path):
                 for f in files:
                     fill_template(os.path.join(root, f), self._json)
 
         # make sure the base image is built
+        print "Building base image..."
         try:
             base_img = os.path.join(core_images_path, "base")
             image_name = DOCKER_USER + "/" + "generic-base"
@@ -195,24 +199,25 @@ class App(object):
             success = False
 
         # construct the app image Dockerfile
+        print "Building app image..."
         app_img_path = os.path.join(build_path, "app")
-        with open(app_img_path, 'a+') as app:
+        shutil.copytree(self.repo, os.path.join(app_img_path, "repo"))
+        with open(os.path.join(app_img_path, "Dockerfile"), 'a+') as app:
 
             if "requirements" in self._json:
-                app.write("ADD {0} requirements.txt\n".format(os.path.join(self.repo, self._json["requirements"])))
+                app.write("ADD {0} requirements.txt\n".format(self._json["requirements"]))
                 app.write("RUN pip install -r requirements.txt\n")
                 app.write("\n")
 
             if "config_scripts" in self._json:
-                for script_name in self._json["config_scripts"]:
-                    script_path = os.path.join(self.repo, script_name)
+                for script_path in self._json["config_scripts"]:
                     with open(script_path, 'r') as script:
                         for line in script.readlines():
                             app.write("RUN {0}\n".format(line))
                         app.write("\n")
 
             if "dockerfile" in self._json:
-                    dockerfile_path = os.path.join(self.repo, script_name)
+                    dockerfile_path = self._json["dockerfile"]
                     with open(dockerfile_path, 'r') as dockerfile:
                         for line in dockerfile.readlines():
                             app.write(line)
@@ -345,9 +350,12 @@ def build_module(args):
         print("Module {0} not found".format(module))
 
 def build_app(args):
-    app = App.get_app(name=args.name)
-    if app:
-        app.build()
+    apps = App.get_app(name=args.name)
+    if isinstance(apps, list):
+        for app in apps:
+            app.build()
+    elif isinstance(apps, App):
+        apps.build()
     else:
         print("App {0} not found".format(app))
 
@@ -384,7 +392,7 @@ def list_apps():
     apps = App.get_app()
     print "Available apps:"
     for app in apps:
-        print(" {0} - last built: {1}`".format(app['name'], app['build_time']))
+        print(" {0} - last built: {1}".format(app.name, app.build_time))
 
 def _list_subparser(parser):
     p = parser.add_parser("list", description="List modules or applications")
@@ -428,6 +436,7 @@ def _upload_subparser(parser):
 
     s.add_parser("module")
     s.add_parser("app")
+
 
 """
 Main section
