@@ -1,6 +1,6 @@
 {
   "components": [
-    "spark-worker": "in-pod",
-    "spark-master": "in-pod"
+    "spark-worker": "module_pod",
+    "spark-master": "module_pod"
   ]
 }

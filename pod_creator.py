@@ -6,6 +6,8 @@ import json
 import subprocess
 import re
 
+from memoized_property import memoized_property
+
 if "POD_SERVER_HOME" not in os.environ:
     raise Exception("POD_SERVER_HOME environment variable must be set")
 
@@ -15,6 +17,19 @@ DOCKER_USER = "andrewosh"
 """
 Utilities
 """
+
+def namespace_params(ns, params):
+    ns_params = {}
+    for p in params:
+        ns_params['app.' + p] = params[p]
+    return ns_params
+
+def fill_template_string(template, params):
+    res = [(re.compile("{{" + k + "}}"), params[k]) for k in params if isinstance(params[k], basestring)]
+    replaced = template
+    for pattern, new in res:
+        replaced = pattern.sub(new, replaced)
+    return replaced
 
 def fill_template(template_path, params):
     try:
@@ -28,6 +43,45 @@ def fill_template(template_path, params):
             template.write(replaced)
     except (IOError, TypeError) as e:
         print("Could not fill template {0}: {1}".format(template_path, e))
+
+"""
+Cluster management
+"""
+
+class ClusterManager(object):
+
+    @staticmethod
+    def get_instance():
+        return KubernetesManager()
+
+    def deploy_app(self, app_dir):
+        """
+        Deploys an app on the cluster. Returns the IP/port combination for the notebook server
+        """
+        pass
+
+    def destroy_app(self, app_id):
+        pass
+
+    def list_apps(self):
+        pass
+
+class KubernetesManager(ClusterManager):
+
+    def deploy_app(self, app_dir):
+        for f in os.listdir(app_dir):
+            path = os.path.join(app_dir, f)
+            try:
+                subprocess.check_call(['kubectl.sh', 'create', '-f', path])
+            except subprocess.CalledProcessError as e:
+                print("Could not deploy {0} on Kubernetes cluster".format(path))
+        # TODO get the return IP/port
+
+    def destroy_app(self, app_id):
+        pass
+
+    def list_apps(self):
+        pass
 
 """
 Indices
@@ -161,6 +215,24 @@ class App(object):
 
         self.build_time = 0
 
+    def _get_app_params(self):
+        # TODO some of these should be moved into some sort of a Defaults class (config file?)
+        return namespace_params("app", {
+                "num_replicas": "5",
+                "project_name": self.name,
+                "id": self.name + "-" + self._get_deployment_id(),
+                "notebooks_name": self.name + "-" + "notebooks",
+                "notebooks_image": DOCKER_USER + "/" + self.name,
+                "notebooks_port": "8888"
+        })
+
+    def _get_deployment_id(self):
+        import time
+        return str(hash(time.time()))
+
+    def _get_modules(self):
+        return [Module.get_module(mod_json["name"], mod_json["version"]) for mod_json in self.modules]
+
     def build(self):
         success = True
 
@@ -172,8 +244,7 @@ class App(object):
 
         # ensure that the module dependencies are all build
         print "Building module dependencies..."
-        for mod_json in self.modules:
-            module = Module.get_module(mod_json["name"], mod_json["version"])
+        for module in self._get_modules():
             module.build()
 
         # copy new file and replace all template placeholders with parameters
@@ -244,7 +315,34 @@ class App(object):
             print("Successfully built app: {0}".format(self.name))
 
     def deploy(self, mode):
-        pass
+        success = True
+
+        # clean up the old deployment
+        deploy_path = os.path.join(self.path, "deploy")
+        if os.path.isdir(deploy_path):
+            shutil.rmtree(deploy_path)
+            os.mkdir(deploy_path)
+
+        modules = self._get_modules()
+        app_params = self._get_app_params()
+
+        # insert the notebooks container into the pod.json template
+        with open(os.path.join(deploy_path, "notebook.json"), 'w+') as nb_file:
+            nb_string = fill_template_string(templates["notebook.json"], app_params)
+            nb_file.write(nb_string)
+
+        # write deployment files for every module (by passing app parameters down to each module)
+        for module in modules:
+            success = module.deploy(mode, deploy_path, app_params.copy())
+
+        # use the cluster manager to deploy each file in the deploy/ folder
+        ClusterManager.get_instance().deploy_app(deploy_path)
+
+        if success:
+            app_id = app_params["app.id"]
+            print("Successfully deployed app {0} in {1} mode with ID {2}".format(self.name, mode, app_id))
+        else:
+            print("Failed to deploy app {0} in {1} mode.".format(self.name, mode))
 
     def destroy(self):
         pass
@@ -275,11 +373,26 @@ class Module(object):
         self.images = self._json.get("images")
         self.parameters = self._json.get("parameters")
 
+    @memoized_property
+    def deployments(self):
+        deps_path = os.path.join(self.path, "deployments")
+        deps = {}
+        for dep in os.listdir(deps_path):
+            with open(os.path.join(deps_path, dep)) as df:
+                deps[dep] = json.load(df)
+        return deps
+
+    @memoized_property
+    def components(self):
+        comps_path = os.path.join(self.path, "components")
+        comps = {}
+        for comp in os.listdir(comps_path):
+            with open(os.path.join(comps_path, comp)) as cf:
+                comps[comp] = json.load(cf)
+        return comps
+
     @property
     def full_name(self):
-        return self.name + "-" + self.version
-
-    def _get_name(self):
         return self.name + "-" + self.version
 
     def build(self):
@@ -321,8 +434,48 @@ class Module(object):
         else:
             print("Image {0} not changed since last build. Not rebuilding.".format(self.full_name))
 
-    def deploy(self, mode):
-        pass
+    def deploy(self, mode, deploy_path, app_params):
+        """
+        Called from within App.deploy
+        """
+        success = True
+
+        deps = self.deployments
+        if mode not in deps:
+            raise Exception("module {0} does not support {1} deployment"\
+                            .format(module.full_name, mode))
+
+        dep_json = deps[mode]
+        comps = module.components
+
+        # load all the template strings
+        # TODO this could be more efficient
+        templates_path = os.path.join(ROOT, "templates")
+        template_names = ["pod.json", "notebook.json", "replicated.json", "service.json"]
+        templates = {}
+        for name in template_names:
+            with open(os.path.join(templates_path, name), 'r') as tf:
+                templates[name] = tf.read()
+
+        for comp in dep_json["components"]:
+            comp_name = comp["name"]
+            comp_type = comp["type"]
+            comp_json = comps[comp_name + ".json"]
+
+            final_params = app_params
+            final_params.update(namespace_params("module", module.parameters.copy()))
+            final_params.update(namespace_params("component", comp.get("parameters", {})))
+
+            filled_comp = fill_template_string(comp, final_params)
+            container = {
+                "containers": filled_comp
+            }
+            filled_template = fill_template_string(templates[comp_type + ".json"], container)
+
+            with open(os.path.join(deploy_path, self.name + "-" + comp_type + ".json"), "w+") as df:
+                df.write(filled_template)
+
+        return success
 
     def to_json(self):
         return self._json
@@ -409,19 +562,24 @@ def handle_deploy(args):
     print("In handle_deploy, args: {0}".format(str(args)))
 
     if args.subcmd == "module":
-        list_modules()
+        deploy_app(args)
     elif args.subcmd == "app":
         list_apps()
 
-def deploy_app(app):
-    pass
+def deploy_app(args):
+    app = App.get_app(name=args.name)
+    if app:
+        app.deploy(mode=args.mode)
+    else:
+        print("App {0} not found".format(app))
 
 def _deploy_subparser(parser):
     p = parser.add_parser("deploy", description="Deploy applications")
     s = p.add_subparsers(dest="subcmd")
 
-    s.add_parser("module")
-    s.add_parser("app")
+    app = s.add_parser("app")
+    app.add_argument("name", help="Name of app to deply", type=str)
+    app.add_argument("mode", help="Deployment mode (i.e. 'single-mode', 'multi-node',...)" , type=str)
 
 """
 Upload section
@@ -436,6 +594,10 @@ def _upload_subparser(parser):
 
     s.add_parser("module")
     s.add_parser("app")
+
+"""
+Cluster section
+"""
 
 
 """
