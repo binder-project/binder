@@ -7,9 +7,9 @@ RUN apt-get update
 # Java setup
 RUN apt-get install -y default-jre
 
-EXPOSE {{web_ui_port}}
-EXPOSE {{app_ui_port}}
-EXPOSE {{master_port}}
+EXPOSE {{web-ui-port}}
+EXPOSE {{app-ui-port}}
+EXPOSE {{master-port}}
 
 # Spark setup
 RUN apt-get install -y wget

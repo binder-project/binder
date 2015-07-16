@@ -1,6 +1,12 @@
 {
   "components": [
-    "spark-worker": "module_pod",
-    "spark-master": "module_pod"
+    {
+      "name": "worker",
+      "type": "module_pod"
+    },
+    {
+      "name": "master",
+      "type": "module_pod"
+    }
   ]
 }

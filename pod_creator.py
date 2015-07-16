@@ -21,19 +21,23 @@ Utilities
 def namespace_params(ns, params):
     ns_params = {}
     for p in params:
-        ns_params['app.' + p] = params[p]
+        ns_params[ns + '.' + p] = params[p]
     return ns_params
 
+def make_patterns(params):
+    return [(re.compile("{{" + k + "}}"), '{0}'.format(params[k])) for k in params]
+
 def fill_template_string(template, params):
-    res = [(re.compile("{{" + k + "}}"), params[k]) for k in params if isinstance(params[k], basestring)]
+    res = make_patterns(params)
     replaced = template
     for pattern, new in res:
         replaced = pattern.sub(new, replaced)
+    print_res = map(lambda (p, s): (p.pattern, s), res)
     return replaced
 
 def fill_template(template_path, params):
     try:
-        res = [(re.compile("{{" + k + "}}"), params[k]) for k in params if isinstance(params[k], basestring)]
+        res = make_patterns(params)
         with open(template_path, 'r+') as template:
             raw = template.read()
         with open(template_path, 'w') as template:
@@ -69,12 +73,15 @@ class ClusterManager(object):
 class KubernetesManager(ClusterManager):
 
     def deploy_app(self, app_dir):
+        success = True
         for f in os.listdir(app_dir):
             path = os.path.join(app_dir, f)
             try:
                 subprocess.check_call(['kubectl.sh', 'create', '-f', path])
             except subprocess.CalledProcessError as e:
+                success = False
                 print("Could not deploy {0} on Kubernetes cluster".format(path))
+        return success
         # TODO get the return IP/port
 
     def destroy_app(self, app_id):
@@ -176,11 +183,12 @@ class FileAppIndex(AppIndex):
             spec_path = os.path.join(app_path, "spec.json")
             try:
                 with open(spec_path, 'r') as sf:
+                    spec = json.load(sf)
                     m = {
-                        "app": json.load(sf),
+                        "app": spec,
                         "path": app_path,
                     }
-                    apps[path] = m
+                    apps[spec["name"]] = m
             except IOError as e:
                 print("Could not build app: {0}".format(path))
         return apps
@@ -213,17 +221,22 @@ class App(object):
         self.requirements = self._json.get("requirements")
         self.repo = os.path.join(self.path, self._json.get("root"))
 
+        self.app_id =  self._get_deployment_id()
+
         self.build_time = 0
 
-    def _get_app_params(self):
+    @property
+    def unique_name(self):
+        return self.name + "-" + self.app_id
+
+    def get_app_params(self):
         # TODO some of these should be moved into some sort of a Defaults class (config file?)
         return namespace_params("app", {
-                "num_replicas": "5",
-                "project_name": self.name,
-                "id": self.name + "-" + self._get_deployment_id(),
+                "name": self.unique_name,
+                "id": self.unique_name,
                 "notebooks_name": self.name + "-" + "notebooks",
                 "notebooks_image": DOCKER_USER + "/" + self.name,
-                "notebooks_port": "8888"
+                "notebooks_port": 8888
         })
 
     def _get_deployment_id(self):
@@ -321,10 +334,18 @@ class App(object):
         deploy_path = os.path.join(self.path, "deploy")
         if os.path.isdir(deploy_path):
             shutil.rmtree(deploy_path)
-            os.mkdir(deploy_path)
+        os.mkdir(deploy_path)
 
         modules = self._get_modules()
-        app_params = self._get_app_params()
+        app_params = self.get_app_params()
+
+        # load all the template strings
+        templates_path = os.path.join(ROOT, "templates")
+        template_names = ["pod.json", "module_pod.json", "notebook.json", "controller.json", "service.json"]
+        templates = {}
+        for name in template_names:
+            with open(os.path.join(templates_path, name), 'r') as tf:
+                templates[name] = tf.read()
 
         # insert the notebooks container into the pod.json template
         with open(os.path.join(deploy_path, "notebook.json"), 'w+') as nb_file:
@@ -333,10 +354,10 @@ class App(object):
 
         # write deployment files for every module (by passing app parameters down to each module)
         for module in modules:
-            success = module.deploy(mode, deploy_path, app_params.copy())
+            success = module.deploy(mode, deploy_path, self, templates)
 
         # use the cluster manager to deploy each file in the deploy/ folder
-        ClusterManager.get_instance().deploy_app(deploy_path)
+        success = ClusterManager.get_instance().deploy_app(deploy_path)
 
         if success:
             app_id = app_params["app.id"]
@@ -379,7 +400,7 @@ class Module(object):
         deps = {}
         for dep in os.listdir(deps_path):
             with open(os.path.join(deps_path, dep)) as df:
-                deps[dep] = json.load(df)
+                deps[dep.split('.')[0]] = df.read()
         return deps
 
     @memoized_property
@@ -388,7 +409,7 @@ class Module(object):
         comps = {}
         for comp in os.listdir(comps_path):
             with open(os.path.join(comps_path, comp)) as cf:
-                comps[comp] = json.load(cf)
+                comps[comp] = cf.read()
         return comps
 
     @property
@@ -434,45 +455,46 @@ class Module(object):
         else:
             print("Image {0} not changed since last build. Not rebuilding.".format(self.full_name))
 
-    def deploy(self, mode, deploy_path, app_params):
+    def deploy(self, mode, deploy_path, app, templates):
         """
         Called from within App.deploy
         """
         success = True
 
+        app_params = app.get_app_params().copy()
+
         deps = self.deployments
         if mode not in deps:
             raise Exception("module {0} does not support {1} deployment"\
-                            .format(module.full_name, mode))
+                            .format(self.full_name, mode))
 
-        dep_json = deps[mode]
-        comps = module.components
+        module_params = app_params
+        module_params.update(namespace_params("module", self.parameters.copy()))
+        dep_json = json.loads(fill_template_string(deps[mode], module_params))
 
-        # load all the template strings
-        # TODO this could be more efficient
-        templates_path = os.path.join(ROOT, "templates")
-        template_names = ["pod.json", "notebook.json", "replicated.json", "service.json"]
-        templates = {}
-        for name in template_names:
-            with open(os.path.join(templates_path, name), 'r') as tf:
-                templates[name] = tf.read()
+        comps = self.components
+
+        print "dep_json[components]: {0}".format(dep_json["components"])
 
         for comp in dep_json["components"]:
             comp_name = comp["name"]
             comp_type = comp["type"]
-            comp_json = comps[comp_name + ".json"]
 
-            final_params = app_params
-            final_params.update(namespace_params("module", module.parameters.copy()))
-            final_params.update(namespace_params("component", comp.get("parameters", {})))
+            comp_params = comp.copy()
+            comp_params.update(comp.get("parameters", {}))
+            # TODO: perhaps this should be done in a cleaner way?
+            comp_params["name"] = comp_params["name"] + "-" + app.app_id
+            comp_params["image_name"] = DOCKER_USER + "/" + self.full_name + "-" + comp["name"]
 
-            filled_comp = fill_template_string(comp, final_params)
-            container = {
-                "containers": filled_comp
-            }
-            filled_template = fill_template_string(templates[comp_type + ".json"], container)
+            final_params = module_params.copy()
+            final_params.update(namespace_params("component", comp_params))
 
-            with open(os.path.join(deploy_path, self.name + "-" + comp_type + ".json"), "w+") as df:
+            filled_comp = fill_template_string(comps[comp_name + ".json"], final_params)
+
+            final_params["containers"] = filled_comp
+            filled_template = fill_template_string(templates[comp_type + ".json"], final_params)
+
+            with open(os.path.join(deploy_path, self.name + "-" + comp_name + ".json"), "w+") as df:
                 df.write(filled_template)
 
         return success
@@ -562,9 +584,9 @@ def handle_deploy(args):
     print("In handle_deploy, args: {0}".format(str(args)))
 
     if args.subcmd == "module":
-        deploy_app(args)
+        raise NotImplementedError
     elif args.subcmd == "app":
-        list_apps()
+        deploy_app(args)
 
 def deploy_app(args):
     app = App.get_app(name=args.name)

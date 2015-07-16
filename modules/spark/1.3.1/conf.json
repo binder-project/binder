@@ -1,16 +1,16 @@
 {
   "parameters": {
-    "master_port": "7077",
-    "web_ui_port": "8080",
-    "app_ui_port": "4040",
-    "worker_port": 8888
+    "master-port": "7077",
+    "web-ui-port": "8080",
+    "app-ui-port": "4040",
+    "worker-port": "8888"
   },
   "images":[
     {
-      "name": "spark-master",
+      "name": "master",
       "dir": "master"
     },
-    { "name": "spark-worker",
+    { "name": "worker",
       "dir": "worker"
     }
   ]

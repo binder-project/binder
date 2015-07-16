@@ -2,10 +2,10 @@
   "kind": "Service",
   "apiVersion": "v1",
   "metadata": {
-    "name": {{component.name}},
+    "name": "{{component.name}}",
     "labels": {
-      "name": {{component.name}},
-      "app_id": {{app.id}}
+      "name": "{{component.name}}",
+      "app_id": "{{app.id}}"
     }
   },
   "spec": {
@@ -16,7 +16,7 @@
       }
     ],
     "selector": {
-      "name": {{component.name}}
+      "name": "{{component.name}}"
     }
   }
 }
