@@ -2,9 +2,9 @@
   "kind": "Pod",
   "apiVersion": "v1",
   "metadata": {
-    "name": "{{app.name}}",
+    "name": "{{component.name}}",
     "labels": {
-      "name": "{{app.name}}",
+      "name": "{{component.name}}",
       "app_id": "{{app.id}}"
     }
   },

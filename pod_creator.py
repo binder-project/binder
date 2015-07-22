@@ -478,24 +478,27 @@ class Module(object):
 
         for comp in dep_json["components"]:
             comp_name = comp["name"]
-            comp_type = comp["type"]
+            for deployment in comp["deployments"]:
+                dep_type = deployment["type"]
 
-            comp_params = comp.copy()
-            comp_params.update(comp.get("parameters", {}))
-            # TODO: perhaps this should be done in a cleaner way?
-            comp_params["name"] = comp_params["name"] + "-" + app.app_id
-            comp_params["image_name"] = DOCKER_USER + "/" + self.full_name + "-" + comp["name"]
+                dep_params = deployment.get("parameters", {}).copy()
+                dep_params.update(comp.get("parameters", {}))
+                # TODO: perhaps this should be done in a cleaner way?
+                dep_params["name"] = comp_name + "-" + app.app_id
+                dep_params["image_name"] = DOCKER_USER + "/" + self.full_name + "-" + comp_name
 
-            final_params = module_params.copy()
-            final_params.update(namespace_params("component", comp_params))
+                final_params = module_params.copy()
+                final_params.update(namespace_params("component", dep_params))
+                print("final_params: {0}".format(final_params))
 
-            filled_comp = fill_template_string(comps[comp_name + ".json"], final_params)
+                filled_comp = fill_template_string(comps[comp_name + ".json"], final_params)
 
-            final_params["containers"] = filled_comp
-            filled_template = fill_template_string(templates[comp_type + ".json"], final_params)
+                final_params["containers"] = filled_comp
+                filled_template = fill_template_string(templates[dep_type + ".json"], final_params)
 
-            with open(os.path.join(deploy_path, self.name + "-" + comp_name + ".json"), "w+") as df:
-                df.write(filled_template)
+                with open(os.path.join(deploy_path, self.name + "-" + comp_name + "-" + dep_type  + ".json")\
+                        , "w+") as df:
+                    df.write(filled_template)
 
         return success
 

@@ -11,8 +11,8 @@
   "spec": {
     "ports": [
       {
-        "port": {{app.service_port}},
-        "targetPort": {{component.pod_port}}
+        "port": {{component.service-port}},
+        "targetPort": {{component.port}}
       }
     ],
     "selector": {
