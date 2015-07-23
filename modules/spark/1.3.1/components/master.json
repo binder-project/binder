@@ -1,0 +1,22 @@
+{
+  "name": "spark-master",
+  "image": "{{component.image_name}}",
+  "command": [
+    "start-master.sh"
+  ],
+  "ports": [
+    {
+      "name": "master-port",
+      "containerPort": {{module.master-port}}
+    },
+    {
+      "name": "web-ui-port",
+      "containerPort": {{module.web-ui-port}}
+    }
+  ],
+  "resources": {
+    "limits": {
+      "cpu": "100m"
+    }
+  }
+}

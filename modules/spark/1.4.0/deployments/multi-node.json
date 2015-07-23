@@ -1,0 +1,17 @@
+{
+  "components": [
+    { "name": "spark-worker",
+      "type": "controller",
+      "parameters": {
+        "num_replicas": "5"
+      }
+    },
+    {
+     "name": "spark-master",
+     "type": "service",
+     "parameters": {
+       "pod_port": {{module.master_port}}
+     }
+    }
+  ]
+}

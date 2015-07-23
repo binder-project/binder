@@ -1,0 +1,22 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "notebook-server",
+    "labels": {
+      "name": "notebook-server"
+    }
+  },
+  "spec": {
+    "containers": [
+    {
+      "name": "notebook-server",
+      "image": "{{app.notebooks_image}}",
+      "ports": [
+        {
+          "containerPort": {{app.notebooks_port}}
+        }
+      ]
+    }]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "notebook",
+    "labels": {
+      "name": "notebook"
+    }
+  },
+  "spec": {
+    "containers": [
+    {
+      "name": "notebook",
+      "image": "andrewosh/codeneuro-notebooks",
+      "ports": [
+        {
+          "containerPort": 8888
+        }
+      ]
+    }]
+  }
+}

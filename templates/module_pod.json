@@ -5,6 +5,7 @@
     "name": "{{component.name}}",
     "labels": {
       "name": "{{component.name}}",
+      "app_id": "{{app.id}}"
     }
   },
   "spec": {

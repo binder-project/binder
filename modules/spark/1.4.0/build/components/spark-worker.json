@@ -1,0 +1,15 @@
+{
+  "name": "spark-worker",
+  "image": {{component.image_name}},
+  "ports": [
+    {
+      "hostPort": {{module.worker_port}},
+      "containerPort": {{module.worker_port}}
+    }
+  ],
+  "resources": {
+    "limits": {
+      "cpu": "100m"
+    }
+  }
+}

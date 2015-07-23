@@ -58,7 +58,13 @@ class ClusterManager(object):
     def get_instance():
         return KubernetesManager()
 
-    def deploy_app(self, app_dir):
+    def start(self, num_minions=3):
+        pass
+
+    def destroy(self):
+        pass
+
+    def deploy_app(self, app_id, app_dir):
         """
         Deploys an app on the cluster. Returns the IP/port combination for the notebook server
         """
@@ -72,14 +78,41 @@ class ClusterManager(object):
 
 class KubernetesManager(ClusterManager):
 
-    def deploy_app(self, app_dir):
+    def start(self, num_minions=3):
+        try:
+            os.environ['NUM_MINIONS'] = str(num_minions)
+            subprocess.check_call(['kube-up.sh'])
+        except subprocess.CalledProcessError as e:
+            print("Could not launch the Kubernetes cluster")
+
+    def destroy(self):
+        try:
+            subprocess.check_call(['kube-down.sh'])
+        except subprocess.CalledProcessError as e:
+            print("Could not destroy the Kubernetes cluster")
+
+    def _create(filename, namespace=None):
         success = True
+        try:
+            cmd = ['kubectl.sh', 'create', '-f', path]
+            if namespace:
+                cmd.append('--namespace={0}'.format(app_id))
+            subprocess.check_call(cmd)
+        except subprocess.CalledProcessError as e:
+            success = False
+        return success
+
+    def deploy_app(self, app_id, app_dir):
+        success = True
+
+        # first create a namespace for the app
+        success = self.create(os.path.join(app_dir, "namespace.json"))
+
+        # now launch all other components in the new namespace
         for f in os.listdir(app_dir):
             path = os.path.join(app_dir, f)
-            try:
-                subprocess.check_call(['kubectl.sh', 'create', '-f', path])
-            except subprocess.CalledProcessError as e:
-                success = False
+            success = self._create(path, namespace=app_id)
+            if not success:
                 print("Could not deploy {0} on Kubernetes cluster".format(path))
         return success
         # TODO get the return IP/port
@@ -225,16 +258,11 @@ class App(object):
 
         self.build_time = 0
 
-    @property
-    def unique_name(self):
-        return self.name + "-" + self.app_id
-
     def get_app_params(self):
         # TODO some of these should be moved into some sort of a Defaults class (config file?)
         return namespace_params("app", {
-                "name": self.unique_name,
-                "id": self.unique_name,
-                "notebooks_name": self.name + "-" + "notebooks",
+                "name": self.name,
+                "id": self.app_id,
                 "notebooks_image": DOCKER_USER + "/" + self.name,
                 "notebooks_port": 8888
         })
@@ -341,7 +369,8 @@ class App(object):
 
         # load all the template strings
         templates_path = os.path.join(ROOT, "templates")
-        template_names = ["pod.json", "module_pod.json", "notebook.json", "controller.json", "service.json"]
+        template_names = ["namespace.json","pod.json", "module_pod.json", "notebook.json",
+                          "controller.json", "service.json"]
         templates = {}
         for name in template_names:
             with open(os.path.join(templates_path, name), 'r') as tf:
@@ -357,7 +386,7 @@ class App(object):
             success = module.deploy(mode, deploy_path, self, templates)
 
         # use the cluster manager to deploy each file in the deploy/ folder
-        success = ClusterManager.get_instance().deploy_app(deploy_path)
+        success = ClusterManager.get_instance().deploy_app(self.app_id, deploy_path)
 
         if success:
             app_id = app_params["app.id"]
@@ -474,8 +503,6 @@ class Module(object):
 
         comps = self.components
 
-        print "dep_json[components]: {0}".format(dep_json["components"])
-
         for comp in dep_json["components"]:
             comp_name = comp["name"]
             for deployment in comp["deployments"]:
@@ -484,7 +511,7 @@ class Module(object):
                 dep_params = deployment.get("parameters", {}).copy()
                 dep_params.update(comp.get("parameters", {}))
                 # TODO: perhaps this should be done in a cleaner way?
-                dep_params["name"] = comp_name + "-" + app.app_id
+                dep_params["name"] = comp_name
                 dep_params["image_name"] = DOCKER_USER + "/" + self.full_name + "-" + comp_name
 
                 final_params = module_params.copy()
@@ -496,7 +523,7 @@ class Module(object):
                 final_params["containers"] = filled_comp
                 filled_template = fill_template_string(templates[dep_type + ".json"], final_params)
 
-                with open(os.path.join(deploy_path, self.name + "-" + comp_name + "-" + dep_type  + ".json")\
+                with open(os.path.join(deploy_path, comp_name + "-" + dep_type  + ".json")\
                         , "w+") as df:
                     df.write(filled_template)
 
@@ -554,7 +581,6 @@ List section
 """
 
 def handle_list(args):
-
     if args.subcmd == "modules":
         list_modules()
     elif args.subcmd == "apps":
@@ -624,6 +650,11 @@ def _upload_subparser(parser):
 Cluster section
 """
 
+def _cluster_subparser(parser):
+    pass
+
+def handle_cluster(args):
+    pass
 
 """
 Main section
@@ -647,6 +678,10 @@ if __name__ == "__main__":
         "build": {
             "parser": _build_subparser,
             "handler": handle_build
+        },
+        "cluster": {
+            "parser": _cluster_subparser,
+            "handler": handle_cluster
         }
     }
 

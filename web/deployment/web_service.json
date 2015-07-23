@@ -1,0 +1,22 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "web-server",
+    "labels": {
+      "name": "web-server"
+    }
+  },
+  "spec": {
+    "type": "LoadBalancer",
+    "ports": [
+      {
+        "port": 80,
+        "targetPort": 80
+      }
+    ],
+    "selector": {
+      "name": "web-server"
+    }
+  }
+}

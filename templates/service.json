@@ -4,8 +4,7 @@
   "metadata": {
     "name": "{{component.name}}",
     "labels": {
-      "name": "{{component.name}}",
-      "app_id": "{{app.id}}"
+      "name": "{{component.name}}"
     }
   },
   "spec": {

@@ -1,0 +1,6 @@
+{
+  "components": [
+    "spark-worker": "replicated",
+    "spark-master": "service"
+  ]
+}

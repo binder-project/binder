@@ -1,0 +1,22 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "notebook",
+    "labels": {
+      "name": "notebook"
+    }
+  },
+  "spec": {
+    "type": "LoadBalancer",
+    "ports": [
+      {
+        "port": 8888,
+        "targetPort": 8888
+      }
+    ],
+    "selector": {
+      "name": "notebook"
+    }
+  }
+}
