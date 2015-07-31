@@ -2,9 +2,9 @@
   "kind": "Service",
   "apiVersion": "v1",
   "metadata": {
-    "name": "web-server",
+    "name": "proxy-registration",
     "labels": {
-      "name": "web-server"
+      "name": "proxy-registration"
     }
   },
   "spec": {
@@ -12,11 +12,11 @@
     "ports": [
       {
         "port": 80,
-        "targetPort": 80
+        "targetPort": 8081
       }
     ],
     "selector": {
-      "name": "web-server"
+      "name": "proxy-server"
     }
   }
 }

@@ -5,6 +5,9 @@ import shutil
 import json
 import subprocess
 import re
+import time
+import requests
+import json
 
 from memoized_property import memoized_property
 
@@ -54,11 +57,19 @@ Cluster management
 
 class ClusterManager(object):
 
+    # the singleton manager
+    manager = None
+
     @staticmethod
     def get_instance():
-        return KubernetesManager()
+        if not ClusterManager.manager:
+            ClusterManager.manager = KubernetesManager()
+        return ClusterManager.manager
 
     def start(self, num_minions=3):
+        pass
+
+    def stop(self):
         pass
 
     def destroy(self):
@@ -76,52 +87,176 @@ class ClusterManager(object):
     def list_apps(self):
         pass
 
+
 class KubernetesManager(ClusterManager):
 
-    def start(self, num_minions=3):
-        try:
-            os.environ['NUM_MINIONS'] = str(num_minions)
-            subprocess.check_call(['kube-up.sh'])
-        except subprocess.CalledProcessError as e:
-            print("Could not launch the Kubernetes cluster")
+    def _generate_auth_token(self):
+        return str(hash(time.time()))
 
-    def destroy(self):
-        try:
-            subprocess.check_call(['kube-down.sh'])
-        except subprocess.CalledProcessError as e:
-            print("Could not destroy the Kubernetes cluster")
-
-    def _create(filename, namespace=None):
+    def _create(self, filename, namespace=None):
         success = True
         try:
-            cmd = ['kubectl.sh', 'create', '-f', path]
+            cmd = ["kubectl.sh", "create", "-f", filename]
             if namespace:
-                cmd.append('--namespace={0}'.format(app_id))
+                cmd.append('--namespace={0}'.format(namespace))
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError as e:
             success = False
         return success
 
-    def deploy_app(self, app_id, app_dir):
-        success = True
+    def _get_proxy_url(self):
+        try:
+            cmd = ["kubectl.sh", "describe", "service", "proxy-registration"]
+            output = subprocess.check_output(cmd)
+            ip_re = re.compile("LoadBalancer Ingress:(?P<ip>.*)\n")
+            m = ip_re.search(output)
+            if not m:
+                print("Could not extract IP from service description")
+                return None
+            return m.group("ip").strip()
+        except subprocess.CalledProcessError as e:
+            return None
 
-        # first create a namespace for the app
-        success = self.create(os.path.join(app_dir, "namespace.json"))
+    def _get_pod_ip(self, app_id):
+        try:
+            cmd = ["kubectl.sh", "describe", "pod", "notebook-server", "--namespace={}".format(app_id)]
+            output = subprocess.check_output(cmd)
+            ip_re = re.compile("IP:(?P<ip>.*)\n")
+            m = ip_re.search(output)
+            if not m:
+                print("Could not extract IP from pod description")
+                return None
+            return m.group("ip").strip()
+        except subprocess.CalledProcessError as e:
+            return None
 
-        # now launch all other components in the new namespace
-        for f in os.listdir(app_dir):
-            path = os.path.join(app_dir, f)
-            success = self._create(path, namespace=app_id)
-            if not success:
-                print("Could not deploy {0} on Kubernetes cluster".format(path))
-        return success
-        # TODO get the return IP/port
+    def _launch_proxy_server(self, token):
+
+        # TODO the following chunk of code is reused in App.deploy (should be abstracted away)
+        web_path = os.path.join(ROOT, "web")
+
+         # clean up the old deployment
+        deploy_path = os.path.join(web_path, "deploy")
+        if os.path.isdir(deploy_path):
+            shutil.rmtree(deploy_path)
+        os.mkdir(deploy_path)
+
+        params = {"token": token}
+
+        # load all the template strings
+        templates_path = os.path.join(web_path, "deployment")
+        template_names = ["proxy-pod.json", "proxy-lookup-service.json", "proxy-registration-service.json"]
+        templates = {}
+        for name in template_names:
+            with open(os.path.join(templates_path, name), 'r') as tf:
+                templates[name] = tf.read()
+
+        # insert the notebooks container into the pod.json template
+        for name in template_names:
+            with open(os.path.join(deploy_path, name), 'w+') as p_file:
+                p_string = fill_template_string(templates[name], params)
+                p_file.write(p_string)
+            # launch each component
+            subprocess.check_call(["kubectl.sh", "create", "-f", os.path.join(deploy_path, name)])
+
+    def _get_proxy_info(self):
+        with open(os.path.join(ROOT, ".proxy_info"), "r") as proxy_file:
+            raw_host, raw_token = proxy_file.readlines()
+            return "http://" + raw_host.strip() + "/api/routes", raw_token.strip()
+
+    def _write_proxy_info(self, url, token):
+        with open(os.path.join(ROOT, ".proxy_info"), "w+") as proxy_file:
+            proxy_file.write("{}\n".format(url))
+            proxy_file.write("{}\n".format(token))
+
+    def _register_proxy_route(self, app_id):
+        from urlparse import urljoin
+
+        num_retries = 20
+        pause = 5
+        for i in range(num_retries):
+            # TODO should the notebook port be a parameter?
+            ip = self._get_pod_ip(app_id)
+            if ip:
+                base_url, token = self._get_proxy_info()
+                body = {'target': "http://" + ip + ":8888"}
+                h = {"Authorization": "token {}".format(token)}
+                proxy_url = base_url + "/" + app_id
+                print("body: {}, headers: {}, proxy_url: {}".format(body, h, proxy_url))
+                r = requests.post(proxy_url, data=json.dumps(body), headers=h)
+                if r.status_code == 201:
+                    print("Proxying {} to {}".format(proxy_url, ip + ":8888"))
+                    return True
+                else:
+                    raise Exception("could not register route with proxy server")
+            print("App not yet assigned an IP address. Waiting for {} seconds...".format(pause))
+            time.sleep(pause)
+
+        return False
+
+    def start(self, num_minions=3, provider="gce"):
+        try:
+            # start the cluster
+            os.environ["NUM_MINIONS"] = str(num_minions)
+            os.environ["KUBERNETES_PROVIDER"] = provider
+            subprocess.check_call(['kube-up.sh'])
+
+            # generate an auth token and launch the proxy server
+            token = self._generate_auth_token()
+            self._launch_proxy_server(token)
+
+            num_retries = 5
+            for i in range(num_retries):
+                print("Sleeping for 20s before getting proxy URL")
+                time.sleep(20)
+                proxy_url = self._get_proxy_url()
+                if proxy_url:
+                    print("proxy_url: {}".format(proxy_url))
+
+                    # record the proxy url and auth token
+                    self._write_proxy_info(proxy_url, token)
+                    return True
+
+            print("Could not obtain the proxy server's URL. Cluster launch unsuccessful")
+            return False
+
+        except subprocess.CalledProcessError as e:
+            print("Could not launch the Kubernetes cluster")
+            return False
+
+    def stop(self, provider="gce"):
+        try:
+            os.environ["KUBERNETES_PROVIDER"] = provider
+            subprocess.check_call(['kube-down.sh'])
+        except subprocess.CalledProcessError as e:
+            print("Could not destroy the Kubernetes cluster")
 
     def destroy_app(self, app_id):
         pass
 
     def list_apps(self):
         pass
+
+    def deploy_app(self, app_id, app_dir):
+        success = True
+
+        # first create a namespace for the app
+        success = self._create(os.path.join(app_dir, "namespace.json"))
+
+        # now launch all other components in the new namespace
+        for f in os.listdir(app_dir):
+            if f != "namespace.json":
+                path = os.path.join(app_dir, f)
+                success = self._create(path, namespace=app_id)
+                if not success:
+                    print("Could not deploy {0} on Kubernetes cluster".format(path))
+
+        # create a route in the proxy
+        success = self._register_proxy_route(app_id)
+
+        return success
+
+
 
 """
 Indices
@@ -241,6 +376,7 @@ class App(object):
     @staticmethod
     def get_app(name=None):
         apps = App.index.find_apps()
+        print "name: {0}, apps: {1}".format(name, str(apps))
         if not name:
             return [App(a) for a in apps.values()]
         return App(apps.get(name))
@@ -249,7 +385,7 @@ class App(object):
         self._json = meta["app"]
         self.path = meta["path"]
         self.name = self._json.get("name")
-        self.modules = self._json.get("modules")
+        self.module_names = self._json.get("modules")
         self.config_scripts = self._json.get("config_scripts")
         self.requirements = self._json.get("requirements")
         self.repo = os.path.join(self.path, self._json.get("root"))
@@ -271,8 +407,9 @@ class App(object):
         import time
         return str(hash(time.time()))
 
-    def _get_modules(self):
-        return [Module.get_module(mod_json["name"], mod_json["version"]) for mod_json in self.modules]
+    @memoized_property
+    def modules(self):
+        return [Module.get_module(mod_json["name"], mod_json["version"]) for mod_json in self.module_names]
 
     def build(self):
         success = True
@@ -285,7 +422,7 @@ class App(object):
 
         # ensure that the module dependencies are all build
         print "Building module dependencies..."
-        for module in self._get_modules():
+        for module in self.modules:
             module.build()
 
         # copy new file and replace all template placeholders with parameters
@@ -316,24 +453,23 @@ class App(object):
         shutil.copytree(self.repo, os.path.join(app_img_path, "repo"))
         with open(os.path.join(app_img_path, "Dockerfile"), 'a+') as app:
 
+            if "config_scripts" in self._json:
+                for script_path in self._json["config_scripts"]:
+                    with open(os.path.join(app_img_path, script_path), 'r') as script:
+                        app.write(script.read())
+                        app.write("\n")
+
             if "requirements" in self._json:
                 app.write("ADD {0} requirements.txt\n".format(self._json["requirements"]))
                 app.write("RUN pip install -r requirements.txt\n")
                 app.write("\n")
 
-            if "config_scripts" in self._json:
-                for script_path in self._json["config_scripts"]:
-                    with open(script_path, 'r') as script:
-                        for line in script.readlines():
-                            app.write("RUN {0}\n".format(line))
-                        app.write("\n")
-
-            if "dockerfile" in self._json:
-                    dockerfile_path = self._json["dockerfile"]
-                    with open(dockerfile_path, 'r') as dockerfile:
-                        for line in dockerfile.readlines():
-                            app.write(line)
-                        app.write("\n")
+            # if any modules have client code, insert that now
+            for module in self.modules:
+                client = module.client if module.client else ""
+                app.write("# {} client\n".format(module.name))
+                app.write(client)
+                app.write("\n")
 
             # add the notebooks to the app image and set the default command
             nb_img_path = os.path.join(build_path, "add_notebooks")
@@ -364,7 +500,7 @@ class App(object):
             shutil.rmtree(deploy_path)
         os.mkdir(deploy_path)
 
-        modules = self._get_modules()
+        modules = self.modules
         app_params = self.get_app_params()
 
         # load all the template strings
@@ -380,6 +516,11 @@ class App(object):
         with open(os.path.join(deploy_path, "notebook.json"), 'w+') as nb_file:
             nb_string = fill_template_string(templates["notebook.json"], app_params)
             nb_file.write(nb_string)
+
+        # insert the namespace file into the deployment folder
+        with open(os.path.join(deploy_path, "namespace.json"), 'w+') as ns_file:
+            ns_string = fill_template_string(templates["namespace.json"], app_params)
+            ns_file.write(ns_string)
 
         # write deployment files for every module (by passing app parameters down to each module)
         for module in modules:
@@ -421,7 +562,7 @@ class Module(object):
         self.version = meta["version"]
         self.last_build = meta.get("last_build")
         self.images = self._json.get("images")
-        self.parameters = self._json.get("parameters")
+        self.parameters = self._json.get("parameters", {})
 
     @memoized_property
     def deployments(self):
@@ -440,6 +581,15 @@ class Module(object):
             with open(os.path.join(comps_path, comp)) as cf:
                 comps[comp] = cf.read()
         return comps
+
+    @memoized_property
+    def client(self):
+        filename = self._json.get("client")
+        if not filename:
+            return None
+        path = os.path.join(self.path, filename)
+        with open(path, 'r') as client_file:
+            return client_file.read()
 
     @property
     def full_name(self):
@@ -574,7 +724,8 @@ def _build_subparser(parser):
     module.add_argument("--all", required=False, help="Build all modules")
 
     app = s.add_parser("app")
-    app.add_argument("name", help="Name of app to build", nargs="*")
+    app.add_argument("name", help="Name of app to build", type=str)
+
 
 """
 List section
@@ -651,10 +802,17 @@ Cluster section
 """
 
 def _cluster_subparser(parser):
-    pass
+    p = parser.add_parser("cluster", description="Manage the cluster")
+    s = p.add_subparsers(dest="subcmd")
+
+    s.add_parser("start")
+    s.add_parser("stop")
 
 def handle_cluster(args):
-    pass
+    if args.subcmd  == "start":
+        ClusterManager.get_instance().start()
+    elif args.subcmd == "stop":
+        ClusterManager.get_instance().stop()
 
 """
 Main section

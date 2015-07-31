@@ -1,0 +1,29 @@
+{
+  "components": [
+    { "name": "worker",
+      "deployments": [
+        {
+          "type": "controller",
+          "parameters": {
+            "num_replicas": "5"
+          }
+        }
+      ]
+    },
+    {
+     "name": "master",
+     "deployments": [
+       {
+         "type": "pod"
+       },
+       {
+         "type": "service",
+         "parameters": {
+           "service-port": {{module.master-port}},
+           "port": {{module.master-port}}
+         }
+       }
+     ]
+    }
+  ]
+}

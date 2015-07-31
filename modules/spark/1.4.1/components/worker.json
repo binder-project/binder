@@ -4,6 +4,9 @@
   "ports": [
     {
       "containerPort": {{module.worker-port}}
+    },
+    {
+      "containerPort": 8080
     }
   ],
   "resources": {

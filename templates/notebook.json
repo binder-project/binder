@@ -16,7 +16,9 @@
         {
           "containerPort": {{app.notebooks_port}}
         }
-      ]
+      ],
+      "command": ["/home/main/start-notebook.sh", "--port={{app.notebooks_port}}",
+                "--NotebookApp.base_url='/{{app.id}}'", "--debug"]
     }]
   }
 }

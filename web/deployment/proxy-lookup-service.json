@@ -2,21 +2,21 @@
   "kind": "Service",
   "apiVersion": "v1",
   "metadata": {
-    "name": "notebook",
+    "name": "proxy-lookup",
     "labels": {
-      "name": "notebook"
+      "name": "proxy-lookup"
     }
   },
   "spec": {
     "type": "LoadBalancer",
     "ports": [
       {
-        "port": 8888,
-        "targetPort": 8888
+        "port": 80,
+        "targetPort": 8080
       }
     ],
     "selector": {
-      "name": "notebook"
+      "name": "proxy-server"
     }
   }
 }

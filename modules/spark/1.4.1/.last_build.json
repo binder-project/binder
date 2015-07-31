@@ -1,0 +1,1 @@
+{"images": [{"name": "master", "dir": "master"}, {"name": "worker", "dir": "worker"}], "client": "client.conf", "parameters": {"web-ui-port": "8080", "worker-port": "8080", "master-port": "7077", "app-ui-port": "4040"}}

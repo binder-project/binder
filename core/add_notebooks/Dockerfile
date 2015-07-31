@@ -6,4 +6,5 @@ WORKDIR $HOME/notebooks
 USER root
 RUN chown -R main:main /home/main/
 
-CMD ipython notebook
+USER main
+

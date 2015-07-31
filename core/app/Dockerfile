@@ -1,3 +1,5 @@
 FROM andrewosh/generic-base
 
-USER main
+USER root
+
+

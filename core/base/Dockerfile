@@ -8,7 +8,7 @@ MAINTAINER Andrew Osheroff <andrewosh@gmail.com>
 
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN apt-get update && apt-get install -y git vim wget build-essential python-dev ca-certificates bzip2 libsm6 && apt-get clean
+RUN apt-get update && apt-get install -y curl git vim wget build-essential python-dev ca-certificates bzip2 libsm6 && apt-get clean
 
 # We run our docker images with a non-root user as a security precaution.
 # main is our user
@@ -24,15 +24,21 @@ WORKDIR $HOME
 
 USER root
 
-RUN apt-get install -y python-pip ipython gcc
+# Install node.js and python dependencies
+RUN apt-get install -y nodejs-legacy npm python-virtualenv python-pip gcc
+RUN pip install --upgrade setuptools pip
 
-RUN pip install ipython[all]
-RUN pip install --upgrade ipython[notebook]
+# Build jupyter notebooks code from source
+RUN git clone https://github.com/jupyter/notebook jupyter-notebook
+RUN pip install --pre -e jupyter-notebook/
 
 USER main
 
 ADD profile_default /home/main/.ipython/profile_default
 ADD templates/ /srv/templates/
+
+# Add helper script
+ADD start-notebook.sh /home/main/
 
 USER root
 RUN chmod a+rX /srv/templates
@@ -46,5 +52,3 @@ RUN find . -name '*.ipynb' -exec ipython nbconvert --to notebook {} --output {} 
 RUN find . -name '*.ipynb' -exec ipython trust {} \;
 
 ENV SHELL /bin/bash
-
-CMD ipython notebook

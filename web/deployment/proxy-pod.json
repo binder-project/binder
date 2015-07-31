@@ -1,0 +1,34 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "proxy-server",
+    "labels": {
+      "name": "proxy-server"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "proxy-server",
+        "image": "andrewosh/proxy-server",
+        "env": [
+          {
+            "name": "CONFIGPROXY_AUTH_TOKEN",
+            "value": "{{token}}"
+          }
+        ],
+        "command": ["configurable-http-proxy", "--port", "8080",
+          "--api-port", "8081", "--api-ip", "0.0.0.0", "--log-level", "debug"],
+        "ports": [
+          {
+            "containerPort": 8080
+          },
+          {
+            "containerPort": 8001
+          }
+        ]
+      }
+    ]
+  }
+}
