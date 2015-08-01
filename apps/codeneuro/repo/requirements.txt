@@ -1,2 +1,3 @@
 requests
+py4j
 thunder-python

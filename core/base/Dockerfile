@@ -28,13 +28,12 @@ USER root
 RUN apt-get install -y nodejs-legacy npm python-virtualenv python-pip gcc
 RUN pip install --upgrade setuptools pip
 
-# Build jupyter notebooks code from source
-RUN git clone https://github.com/jupyter/notebook jupyter-notebook
-RUN pip install --pre -e jupyter-notebook/
+# Install Anaconda and Jupyter
+RUN wget https://3230d63b5fc54e62148e-c95ac804525aac4b6dba79b00b39d1d3.ssl.cf1.rackcdn.com/Anaconda-2.3.0-Linux-x86_64.sh
+RUN bash Anaconda-2.3.0-Linux-x86_64.sh -b
+ENV PATH $HOME/anaconda/bin:$PATH
 
-USER main
-
-ADD profile_default /home/main/.ipython/profile_default
+# ADD profile_default /home/main/.ipython/profile_default
 ADD templates/ /srv/templates/
 
 # Add helper script
@@ -44,8 +43,6 @@ USER root
 RUN chmod a+rX /srv/templates
 RUN chown -R main:main /home/main
 USER main
-
-RUN ipython profile create
 
 # Convert notebooks to the current format
 RUN find . -name '*.ipynb' -exec ipython nbconvert --to notebook {} --output {} \;

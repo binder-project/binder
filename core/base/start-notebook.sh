@@ -1,2 +1,2 @@
 #!/bin/bash
-jupyter notebook "$@"
+ipython notebook "$@"

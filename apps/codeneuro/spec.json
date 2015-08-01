@@ -2,9 +2,6 @@
   "name": "codeneuro-notebooks",
   "root": "repo",
   "requirements": "repo/requirements.txt",
-  "config_scripts": [
-    "repo/setup.conf"
-  ],
   "notebooks": "repo/notebooks",
   "modules": [
     {
