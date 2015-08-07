@@ -1,5 +1,7 @@
 # Binder
 
+[![Join the chat at https://gitter.im/binder-project/binder](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/binder-project/binder?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 A system for deploying a collection of Jupyter notebooks and their dependencies across one or more nodes of a Kubernetes cluster.
 
 **WIP** and under very active development! Definitely reach out if you'd like to get involved!
