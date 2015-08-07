@@ -23,7 +23,7 @@ The above step results in a link that, when clicked, will populate template file
 ### Concepts
 - `services` : Modular, versioned components that can be configured and added to an app, e.g. databases, Spark, etc. Services are allowed to have client-specific code that can be inserted into the notebook image at build time
 
-- `notebooks`: This is the main entrypoint and includes Jupyter notebooks and simple dependencies that don't require separate services (e.g. requirements.txt)
+- `notebooks`: This is the main entrypoint and includes Jupyter notebooks and simple dependencies that don't require separate services (e.g. `requirements.txt` for `pip` installable dependencies)
 
 - `binder` : A combination of notebooks and services in a single, deployable app
 
