@@ -4,7 +4,7 @@
 
 A system for deploying a collection of Jupyter notebooks and their dependencies across one or more nodes of a Kubernetes cluster.
 
-**WIP** and under very active development! Definitely reach out if you'd like to get involved!
+**WIP** and under very active development. We will add full deployment instructions (and a test demo) soon. Definitely reach out if you'd like to get involved!
 
 ### Goals
 - Provide "one-click" deployment straight from a GitHub repo to interactive Jupyter notebooks
