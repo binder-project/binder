@@ -11,14 +11,14 @@
     "containers": [
     {
       "name": "notebook-server",
-      "image": "{{app.notebooks_image}}",
+      "image": "{{app.notebooks-image}}",
       "ports": [
         {
-          "containerPort": {{app.notebooks_port}}
+          "containerPort": {{app.notebooks-port}}
         }
       ],
-      "command": ["/home/main/start-notebook.sh", "--ip='*'", "--port={{app.notebooks_port}}",
-                "--NotebookApp.base_url='/{{app.id}}'", "--debug"]
+      "command": ["/home/main/start-notebook.sh", "--ip='*'", "--port={{app.notebooks-port}}",
+                "--NotebookApp.base-url='/{{app.id}}'", "--debug"]
     }]
   }
 }

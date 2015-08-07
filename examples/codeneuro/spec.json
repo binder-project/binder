@@ -1,6 +1,7 @@
 {
   "name": "codeneuro-notebooks",
   "root": "repo",
+  "repo": "https://github.com/CodeNeuro/notebooks",
   "requirements": "repo/requirements.txt",
   "notebooks": "repo/notebooks",
   "modules": [
