@@ -14,7 +14,7 @@ A system for deploying a collection of Jupyter notebooks and their dependencies 
 
 A typical deployment would work like this. 
 
-A user would provide a repo and a selected set on services on a website. Given that info, we build and upload docker images for core notebook dependencies and all required services (if not already built). This can take a few minutes, but only needs to happen once per repo. It will need to be repeated if the repo is updated, but we've designed our images to be modular and hopefully make this process faster.
+A user would provide a GitHub repo and a selected set on services on a website. Given that info, we build and upload docker images for core notebook dependencies and all required services (if not already built). This can take a few minutes, but only needs to happen once per repo. It will need to be repeated if the repo is updated, but we've designed our images to be modular and hopefully make this process faster.
 
 The above step results in a link that, when clicked, will populate template files for both services and notebooks, and launch the images associated with the binder on a cluster using Kubernetes
 
