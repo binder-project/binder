@@ -133,10 +133,10 @@ class KubernetesManager(ClusterManager):
     def _launch_proxy_server(self, token):
 
         # TODO the following chunk of code is reused in App.deploy (should be abstracted away)
-        web_path = os.path.join(ROOT, "web")
+        proxy_path = os.path.join(ROOT, "proxy")
 
          # clean up the old deployment
-        deploy_path = os.path.join(web_path, "deploy")
+        deploy_path = os.path.join(proxy_path, "deploy")
         if os.path.isdir(deploy_path):
             shutil.rmtree(deploy_path)
         os.mkdir(deploy_path)
@@ -144,7 +144,7 @@ class KubernetesManager(ClusterManager):
         params = {"token": token}
 
         # load all the template strings
-        templates_path = os.path.join(web_path, "deployment")
+        templates_path = os.path.join(proxy_path, "deployment")
         template_names = ["proxy-pod.json", "proxy-lookup-service.json", "proxy-registration-service.json"]
         templates = {}
         for name in template_names:
@@ -170,8 +170,6 @@ class KubernetesManager(ClusterManager):
             proxy_file.write("{}\n".format(token))
 
     def _register_proxy_route(self, app_id):
-        from urlparse import urljoin
-
         num_retries = 20
         pause = 5
         for i in range(num_retries):
@@ -212,7 +210,6 @@ class KubernetesManager(ClusterManager):
                 proxy_url = self._get_proxy_url()
                 if proxy_url:
                     print("proxy_url: {}".format(proxy_url))
-
                     # record the proxy url and auth token
                     self._write_proxy_info(proxy_url, token)
                     return True
@@ -256,8 +253,6 @@ class KubernetesManager(ClusterManager):
 
         return success
 
-
-
 """
 Indices
 """
@@ -278,59 +273,59 @@ class AppIndex(object):
         pass
 
 
-class ModuleIndex(object):
+class ServiceIndex(object):
     """
-    Responsible for finding and managing metadata about modules
+    Responsible for finding and managing metadata about services
     """
 
     @staticmethod
     def get_index(*args, **kwargs):
-        return FileModuleIndex(*args, **kwargs)
+        return FileServiceIndex(*args, **kwargs)
 
-    def find_modules(self):
+    def find_services(self):
         pass
 
-    def save_module(self, module):
+    def save_service(self, service):
         pass
 
 
-class FileModuleIndex(ModuleIndex):
+class FileServiceIndex(ServiceIndex):
     """
-    Finds/manages modules by searching for a certain directory structure in a directory hierarchy
+    Finds/manages services by searching for a certain directory structure in a directory hierarchy
     """
 
-    MODULE_DIR = "modules"
+    SERVICES_DIR = "services"
 
     def __init__(self, root):
-        self.module_dir = os.path.join(root, self.MODULE_DIR)
+        self.services_dir = os.path.join(root, self.SERVICES_DIR)
 
-    def find_modules(self):
-        modules = {}
-        for path in os.listdir(self.module_dir):
-            mod_path = os.path.join(self.module_dir, path)
-            for version in os.listdir(mod_path):
-                full_path = os.path.join(mod_path, version)
+    def find_services(self):
+        services = {}
+        for name in os.listdir(self.services_dir):
+            path = os.path.join(self.services_dir, name)
+            for version in os.listdir(path):
+                full_path = os.path.join(path, version)
                 conf_path = os.path.join(full_path, "conf.json")
                 last_build_path = os.path.join(full_path, ".last_build.json")
                 try:
                     with open(conf_path, 'r') as cf:
-                        m = {
-                            "module": json.load(cf),
+                        s = {
+                            "service": json.load(cf),
                             "path": full_path,
                             "name": path,
                             "version": version
                         }
                         if os.path.isfile(last_build_path):
                             with open(last_build_path, 'r') as lbf:
-                                m["last_build"] = json.load(lbf)
-                        modules[path + '-' + version] = m
-                except IOError as e:
-                    print("Could not build module: {0}".format(path + "-" + version))
-        return modules
+                                s["last_build"] = json.load(lbf)
+                        services[path + '-' + version] = s
+                except IOError:
+                    print("Could not build service: {0}".format(path + "-" + version))
+        return services
 
-    def save_module(self, module):
-        j = module.to_json()
-        with open(os.path.join(module.path, ".last_build.json"), "w") as f:
+    def save_service(self, service):
+        j = service.to_json()
+        with open(os.path.join(service.path, ".last_build.json"), "w") as f:
             f.write(json.dumps(j))
 
 
@@ -385,12 +380,12 @@ class App(object):
         self._json = meta["app"]
         self.path = meta["path"]
         self.name = self._json.get("name")
-        self.module_names = self._json.get("modules")
+        self.service_names = self._json.get("services")
         self.config_scripts = self._json.get("config_scripts")
         self.requirements = self._json.get("requirements")
         self.repo = os.path.join(self.path, self._json.get("root"))
 
-        self.app_id =  self._get_deployment_id()
+        self.app_id = self._get_deployment_id()
 
         self.build_time = 0
 
@@ -408,8 +403,8 @@ class App(object):
         return str(hash(time.time()))
 
     @memoized_property
-    def modules(self):
-        return [Module.get_module(mod_json["name"], mod_json["version"]) for mod_json in self.module_names]
+    def services(self):
+        return [Service.get_service(s_json["name"], s_json["version"]) for s_json in self.service_names]
 
     def build(self):
         success = True
@@ -420,10 +415,10 @@ class App(object):
             shutil.rmtree(build_path)
             os.mkdir(build_path)
 
-        # ensure that the module dependencies are all build
-        print "Building module dependencies..."
-        for module in self.modules:
-            module.build()
+        # ensure that the service dependencies are all build
+        print "Building service dependencies..."
+        for service in self.services:
+            service.build()
 
         # copy new file and replace all template placeholders with parameters
         print "Copying files and filling templates..."
@@ -464,10 +459,10 @@ class App(object):
                 app.write("RUN pip install -r requirements.txt\n")
                 app.write("\n")
 
-            # if any modules have client code, insert that now
-            for module in self.modules:
-                client = module.client if module.client else ""
-                app.write("# {} client\n".format(module.name))
+            # if any services have client code, insert that now
+            for service in self.services:
+                client = service.client if service.client else ""
+                app.write("# {} client\n".format(service.name))
                 app.write(client)
                 app.write("\n")
 
@@ -500,12 +495,12 @@ class App(object):
             shutil.rmtree(deploy_path)
         os.mkdir(deploy_path)
 
-        modules = self.modules
+        services = self.services
         app_params = self.get_app_params()
 
         # load all the template strings
         templates_path = os.path.join(ROOT, "templates")
-        template_names = ["namespace.json","pod.json", "module_pod.json", "notebook.json",
+        template_names = ["namespace.json", "pod.json", "service-pod.json", "notebook.json",
                           "controller.json", "service.json"]
         templates = {}
         for name in template_names:
@@ -522,9 +517,9 @@ class App(object):
             ns_string = fill_template_string(templates["namespace.json"], app_params)
             ns_file.write(ns_string)
 
-        # write deployment files for every module (by passing app parameters down to each module)
-        for module in modules:
-            success = module.deploy(mode, deploy_path, self, templates)
+        # write deployment files for every service (by passing app parameters down to each service)
+        for service in services:
+            success = service.deploy(mode, deploy_path, self, templates)
 
         # use the cluster manager to deploy each file in the deploy/ folder
         success = ClusterManager.get_instance().deploy_app(self.app_id, deploy_path)
@@ -539,24 +534,24 @@ class App(object):
         pass
 
 
-class Module(object):
+class Service(object):
 
-    index = ModuleIndex.get_index(ROOT)
+    index = ServiceIndex.get_index(ROOT)
 
     @staticmethod
-    def get_module(name=None, version=None):
-        modules = Module.index.find_modules()
+    def get_service(name=None, version=None):
+        services = Service.index.find_services()
         if not name and not version:
-            return [Module(m) for m in modules.values()]
+            return [Service(s) for s in services.values()]
         if not name or not version:
             raise ValueError("must specify both name and version or neither")
         full_name = name + "-" + version
-        if full_name not in modules:
-            raise ValueError("module {0} not found.".format(full_name))
-        return Module(modules[full_name])
+        if full_name not in services:
+            raise ValueError("service {0} not found.".format(full_name))
+        return Service(services[full_name])
 
     def __init__(self, meta):
-        self._json = meta["module"]
+        self._json = meta["service"]
         self.path = meta["path"]
         self.name = meta["name"]
         self.version = meta["version"]
@@ -628,7 +623,7 @@ class Module(object):
             if success:
                 print("Successfully build {0}".format(self.full_name))
                 # write latest build parameters
-                self.index.save_module(self)
+                self.index.save_service(self)
             else:
                 print("Failed to build {0}".format(self.full_name))
         else:
@@ -644,12 +639,12 @@ class Module(object):
 
         deps = self.deployments
         if mode not in deps:
-            raise Exception("module {0} does not support {1} deployment"\
+            raise Exception("service {0} does not support {1} deployment"\
                             .format(self.full_name, mode))
 
-        module_params = app_params
-        module_params.update(namespace_params("module", self.parameters.copy()))
-        dep_json = json.loads(fill_template_string(deps[mode], module_params))
+        service_params = app_params
+        service_params.update(namespace_params("service", self.parameters.copy()))
+        dep_json = json.loads(fill_template_string(deps[mode], service_params))
 
         comps = self.components
 
@@ -664,7 +659,7 @@ class Module(object):
                 dep_params["name"] = comp_name
                 dep_params["image_name"] = DOCKER_USER + "/" + self.full_name + "-" + comp_name
 
-                final_params = module_params.copy()
+                final_params = service_params.copy()
                 final_params.update(namespace_params("component", dep_params))
                 print("final_params: {0}".format(final_params))
 
@@ -673,7 +668,7 @@ class Module(object):
                 final_params["containers"] = filled_comp
                 filled_template = fill_template_string(templates[dep_type + ".json"], final_params)
 
-                with open(os.path.join(deploy_path, comp_name + "-" + dep_type  + ".json")\
+                with open(os.path.join(deploy_path, comp_name + "-" + dep_type + ".json")\
                         , "w+") as df:
                     df.write(filled_template)
 
@@ -689,20 +684,20 @@ Build section
 
 def handle_build(args):
     print("In handle_build, args: {0}".format(str(args)))
-    if args.subcmd == "module":
-        build_module(args)
+    if args.subcmd == "service":
+        build_service(args)
     elif args.subcmd == "app":
         build_app(args)
 
-def build_module(args):
-    modules = Module.get_module(name=args.name)
-    if isinstance(modules, list):
-        for m in modules:
-            m.build()
-    elif module:
-        module.build()
+def build_service(args):
+    service = Service.get_service(name=args.name)
+    if isinstance(service, list):
+        for s in service:
+            s.build()
+    elif service:
+        service.build()
     else:
-        print("Module {0} not found".format(module))
+        print("Service {0} not found".format(service))
 
 def build_app(args):
     apps = App.get_app(name=args.name)
@@ -715,13 +710,13 @@ def build_app(args):
         print("App {0} not found".format(app))
 
 def _build_subparser(parser):
-    p = parser.add_parser("build", description="Build modules or applications")
+    p = parser.add_parser("build", description="Build services or applications")
     s = p.add_subparsers(dest="subcmd")
 
-    module = s.add_parser("module")
-    module.add_argument("name", help="Name of module to build", nargs="?")
-    module.add_argument("--upload", required=False, help="Upload module after building")
-    module.add_argument("--all", required=False, help="Build all modules")
+    service = s.add_parser("service")
+    service.add_argument("name", help="Name of service to build", nargs="?")
+    service.add_argument("--upload", required=False, help="Upload service after building")
+    service.add_argument("--all", required=False, help="Build all services")
 
     app = s.add_parser("app")
     app.add_argument("name", help="Name of app to build", type=str)
@@ -732,16 +727,16 @@ List section
 """
 
 def handle_list(args):
-    if args.subcmd == "modules":
-        list_modules()
+    if args.subcmd == "services":
+        list_services()
     elif args.subcmd == "apps":
         list_apps()
 
-def list_modules():
-    modules = Module.get_module()
-    print "Available modules:"
-    for module in modules:
-        print(" {0}".format(module.full_name))
+def list_services():
+    services = Service.get_service()
+    print "Available services:"
+    for service in services:
+        print(" {0}".format(service.full_name))
 
 def list_apps():
     apps = App.get_app()
@@ -750,10 +745,10 @@ def list_apps():
         print(" {0} - last built: {1}".format(app.name, app.build_time))
 
 def _list_subparser(parser):
-    p = parser.add_parser("list", description="List modules or applications")
+    p = parser.add_parser("list", description="List services or applications")
     s = p.add_subparsers(dest="subcmd")
 
-    mod_parser = s.add_parser("modules")
+    service_parser = s.add_parser("services")
     app_parser = s.add_parser("apps")
 
 """
@@ -763,7 +758,7 @@ Deploy section
 def handle_deploy(args):
     print("In handle_deploy, args: {0}".format(str(args)))
 
-    if args.subcmd == "module":
+    if args.subcmd == "service":
         raise NotImplementedError
     elif args.subcmd == "app":
         deploy_app(args)
@@ -791,10 +786,10 @@ def handle_upload(args):
     print("In handle_upload, args: {0}".format(str(args)))
 
 def _upload_subparser(parser):
-    p = parser.add_parser("upload", description="Upload modules or applications")
+    p = parser.add_parser("upload", description="Upload services or applications")
     s = p.add_subparsers(dest="subcmd")
 
-    s.add_parser("module")
+    s.add_parser("service")
     s.add_parser("app")
 
 """
