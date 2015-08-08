@@ -10,7 +10,7 @@
      "name": "spark-master",
      "type": "service",
      "parameters": {
-       "pod_port": {{module.master_port}}
+       "pod_port": {{service.master-port}}
      }
     }
   ]

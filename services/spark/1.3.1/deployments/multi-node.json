@@ -19,8 +19,8 @@
        {
          "type": "service",
          "parameters": {
-           "service-port": {{module.master-port}},
-           "port": {{module.master-port}}
+           "service-port": {{service.master-port}},
+           "port": {{service.master-port}}
          }
        }
      ]

@@ -3,8 +3,8 @@
   "image": {{component.image_name}},
   "ports": [
     {
-      "hostPort": {{module.worker_port}},
-      "containerPort": {{module.worker_port}}
+      "hostPort": {{service.worker-port}},
+      "containerPort": {{service.worker-port}}
     }
   ],
   "resources": {

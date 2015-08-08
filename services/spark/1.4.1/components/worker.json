@@ -3,7 +3,7 @@
   "image": "{{component.image_name}}:latest",
   "ports": [
     {
-      "containerPort": {{module.worker-port}}
+      "containerPort": {{service.worker-port}}
     },
     {
       "containerPort": 8080
@@ -14,5 +14,5 @@
       "cpu": "100m"
     }
   },
-  "command": ["./start.sh", "spark://master:{{module.master-port}}"]
+  "command": ["./start.sh", "spark://master:{{service.master-port}}"]
 }
