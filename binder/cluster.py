@@ -5,7 +5,9 @@ import shutil
 import subprocess
 import time
 import requests
-from binder.pod_creator import ROOT, fill_template_string
+
+from binder.settings import ROOT
+from binder.utils import fill_template_string
 
 
 class ClusterManager(object):

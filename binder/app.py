@@ -2,7 +2,8 @@ import os
 import shutil
 import subprocess
 from memoized_property import memoized_property
-from binder.pod_creator import ROOT, namespace_params, DOCKER_USER, fill_template, fill_template_string
+from binder.settings import ROOT, DOCKER_USER
+from binder.utils import namespace_params, fill_template, fill_template_string
 from binder.cluster import ClusterManager
 from binder.indices import AppIndex
 from binder.service import Service
