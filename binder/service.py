@@ -2,10 +2,11 @@ import json
 import os
 import shutil
 import subprocess
+
 from memoized_property import memoized_property
 
 from binder.settings import ROOT, DOCKER_USER
-from binder.utils import fill_template_string, fill_template, namespace_params
+from binder.utils import fill_template_string, fill_template, namespace_params, make_dir
 from binder.indices import ServiceIndex
 
 
@@ -72,9 +73,7 @@ class Service(object):
 
             # clean up the old build
             build_path = os.path.join(self.path, "build")
-            if os.path.isdir(build_path):
-                shutil.rmtree(build_path)
-                os.mkdir(build_path)
+            make_dir(build_path, clean=True)
 
             # copy new file and replace all template placeholders with parameters
             build_dirs = ["components", "deployments", "images"]
@@ -110,14 +109,12 @@ class Service(object):
         """
         success = True
 
-        app_params = app.get_app_params().copy()
-
         deps = self.deployments
         if mode not in deps:
             raise Exception("service {0} does not support {1} deployment"\
                             .format(self.full_name, mode))
 
-        service_params = app_params
+        service_params = app.get_app_params().copy()
         service_params.update(namespace_params("service", self.parameters.copy()))
         dep_json = json.loads(fill_template_string(deps[mode], service_params))
 
@@ -130,12 +127,12 @@ class Service(object):
 
                 dep_params = deployment.get("parameters", {}).copy()
                 dep_params.update(comp.get("parameters", {}))
+
                 # TODO: perhaps this should be done in a cleaner way?
                 dep_params["name"] = comp_name
-                dep_params["image_name"] = DOCKER_USER + "/" + self.full_name + "-" + comp_name
+                dep_params["image-name"] = DOCKER_USER + "/" + self.full_name + "-" + comp_name
 
-                final_params = service_params.copy()
-                final_params.update(namespace_params("component", dep_params))
+                final_params = dict(service_params.items() + namespace_params("component", dep_params).items())
                 print("final_params: {0}".format(final_params))
 
                 filled_comp = fill_template_string(comps[comp_name + ".json"], final_params)
@@ -143,8 +140,7 @@ class Service(object):
                 final_params["containers"] = filled_comp
                 filled_template = fill_template_string(templates[dep_type + ".json"], final_params)
 
-                with open(os.path.join(deploy_path, comp_name + "-" + dep_type + ".json")\
-                        , "w+") as df:
+                with open(os.path.join(deploy_path, comp_name + "-" + dep_type + ".json"), "w+") as df:
                     df.write(filled_template)
 
         return success

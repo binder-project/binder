@@ -1,3 +1,6 @@
+import shutil
+import os
+import re
 
 def namespace_params(ns, params):
     ns_params = {}
@@ -13,7 +16,6 @@ def fill_template_string(template, params):
     replaced = template
     for pattern, new in res:
         replaced = pattern.sub(new, replaced)
-    print_res = map(lambda (p, s): (p.pattern, s), res)
     return replaced
 
 def fill_template(template_path, params):
@@ -28,3 +30,8 @@ def fill_template(template_path, params):
             template.write(replaced)
     except (IOError, TypeError) as e:
         print("Could not fill template {0}: {1}".format(template_path, e))
+
+def make_dir(path, clean=False):
+    if os.path.isdir(path) and clean:
+        shutil.rmtree(path)
+    os.mkdir(path)

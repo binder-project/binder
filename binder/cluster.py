@@ -100,7 +100,7 @@ class KubernetesManager(ClusterManager):
 
         # load all the template strings
         templates_path = os.path.join(proxy_path, "deployment")
-        template_names = ["proxy-pod.json", "proxy-lookup-service.json", "proxy-registration-service.json"]
+        template_names = os.listdir(templates_path)
         templates = {}
         for name in template_names:
             with open(os.path.join(templates_path, name), 'r') as tf:

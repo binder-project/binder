@@ -1,9 +1,12 @@
 import os
 import shutil
 import subprocess
+import time
+
 from memoized_property import memoized_property
+
 from binder.settings import ROOT, DOCKER_USER
-from binder.utils import namespace_params, fill_template, fill_template_string
+from binder.utils import namespace_params, fill_template, fill_template_string, make_dir
 from binder.cluster import ClusterManager
 from binder.indices import AppIndex
 from binder.service import Service
@@ -26,39 +29,42 @@ class App(object):
         self.path = meta["path"]
         self.name = self._json.get("name")
         self.service_names = self._json.get("services")
-        self.config_scripts = self._json.get("config_scripts")
+        self.config_scripts = self._json.get("config-scripts")
         self.requirements = self._json.get("requirements")
-        self.repo = os.path.join(self.path, self._json.get("root"))
+        self.repo_url = self._json.get("repo")
+
+        # set once the repo is cloned
+        self.repo = None
 
         self.app_id = self._get_deployment_id()
 
         self.build_time = 0
 
-    def get_app_params(self):
-        # TODO some of these should be moved into some sort of a Defaults class (config file?)
-        return namespace_params("app", {
-                "name": self.name,
-                "id": self.app_id,
-                "notebooks_image": DOCKER_USER + "/" + self.name,
-                "notebooks_port": 8888
-        })
-
-    def _get_deployment_id(self):
-        import time
-        return str(hash(time.time()))
-
     @memoized_property
     def services(self):
         return [Service.get_service(s_json["name"], s_json["version"]) for s_json in self.service_names]
+
+    def get_app_params(self):
+        # TODO some of these should be moved into some sort of a Defaults class (config file?)
+        return namespace_params("app", {
+            "name": self.name,
+            "id": self.app_id,
+            "notebooks_image": DOCKER_USER + "/" + self.name,
+            "notebooks_port": 8888
+        })
+
+    def _get_deployment_id(self):
+        return str(hash(time.time()))
+
+    def _fetch_repo(self):
+        pass
 
     def build(self):
         success = True
 
         # clean up the old build
         build_path = os.path.join(self.path, "build")
-        if os.path.isdir(build_path):
-            shutil.rmtree(build_path)
-            os.mkdir(build_path)
+        make_dir(os.path.join(self.path, "build"), clean=True)
 
         # ensure that the service dependencies are all build
         print "Building service dependencies..."
@@ -67,9 +73,9 @@ class App(object):
 
         # copy new file and replace all template placeholders with parameters
         print "Copying files and filling templates..."
-        core_images_path = os.path.join(ROOT, "core")
-        for img in os.listdir(core_images_path):
-            img_path = os.path.join(core_images_path, img)
+        images_path = os.path.join(ROOT, "images")
+        for img in os.listdir(images_path):
+            img_path = os.path.join(images_path, img)
             bd_path = os.path.join(build_path, img)
             shutil.copytree(img_path, bd_path)
             for root, dirs, files in os.walk(bd_path):
@@ -79,7 +85,7 @@ class App(object):
         # make sure the base image is built
         print "Building base image..."
         try:
-            base_img = os.path.join(core_images_path, "base")
+            base_img = os.path.join(images_path, "base")
             image_name = DOCKER_USER + "/" + "generic-base"
             subprocess.check_call(['docker', 'build', '-t', image_name, base_img])
             subprocess.check_call(['docker', 'push', image_name])
@@ -94,7 +100,7 @@ class App(object):
         with open(os.path.join(app_img_path, "Dockerfile"), 'a+') as app:
 
             if "config_scripts" in self._json:
-                for script_path in self._json["config_scripts"]:
+                for script_path in self._json["config-scripts"]:
                     with open(os.path.join(app_img_path, script_path), 'r') as script:
                         app.write(script.read())
                         app.write("\n")

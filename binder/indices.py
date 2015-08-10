@@ -1,15 +1,21 @@
 import json
 import os
 
+from binder.utils import make_dir
+
 
 class AppIndex(object):
     """
     Responsible for finding and managing metadata about apps.
     """
 
+    _singleton = None
+
     @staticmethod
     def get_index(*args, **kwargs):
-        return FileAppIndex(*args, **kwargs)
+        if not AppIndex._singleton:
+            AppIndex._singleton = FileAppIndex(*args, **kwargs)
+        return AppIndex._singleton
 
     def get_app(self):
         pass
@@ -27,6 +33,7 @@ class FileAppIndex(AppIndex):
 
     def __init__(self, root):
         self.app_dir = os.path.join(root, self.APP_DIR)
+        make_dir(self.app_dir)
 
     def find_apps(self):
         apps = {}
@@ -54,9 +61,13 @@ class ServiceIndex(object):
     Responsible for finding and managing metadata about services
     """
 
+    _singleton = None
+
     @staticmethod
     def get_index(*args, **kwargs):
-        return FileServiceIndex(*args, **kwargs)
+        if not ServiceIndex._singleton:
+            ServiceIndex._singleton = FileServiceIndex(*args, **kwargs)
+        return ServiceIndex._singleton
 
     def find_services(self):
         pass
