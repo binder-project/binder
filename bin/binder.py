@@ -35,7 +35,7 @@ def build_app(args):
     elif isinstance(apps, App):
         apps.build()
     else:
-        print("App {0} not found".format(app))
+        print("App {0} not found".format(apps))
 
 def _build_subparser(parser):
     p = parser.add_parser("build", description="Build services or applications")
