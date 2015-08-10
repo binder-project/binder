@@ -2,7 +2,7 @@
 
 [![Join the chat at https://gitter.im/binder-project/binder](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/binder-project/binder?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-A system for deploying a collection of Jupyter notebooks and their dependencies as live, interactive notebooks, across one or more nodes of a Kubernetes cluster.
+A system for deploying a collection of Jupyter notebooks and their dependencies as live, interactive notebooks, straight from GitHub repositories, across one or more nodes of a Kubernetes cluster.
 
 **WIP** and under very active development. We will add full deployment instructions (and a test demo) soon. Definitely reach out if you'd like to get involved!
 
