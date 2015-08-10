@@ -32,7 +32,7 @@ The above step results in a link that, when clicked, will populate template file
 
 - `proxy` : Maintains and registers routes to apps deployed on a cluster
 
-- `modules` : Services that are independent of particular apps and configurable, for example, databases, Spark, etc.
+- `services` : Services that are independent of particular apps and configurable, for example, databases, Spark, etc.
 
 - `binder` : Core utilities and CLI for building, managing, and deploying binders
 
