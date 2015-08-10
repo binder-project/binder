@@ -24,6 +24,10 @@ class App(object):
             return [App(a) for a in apps.values()]
         return App(apps.get(name))
 
+    @staticmethod
+    def _get_deployment_id():
+        return str(hash(time.time()))
+
     def __init__(self, meta):
         self._json = meta["app"]
         self.path = meta["path"]
@@ -36,9 +40,12 @@ class App(object):
         # set once the repo is cloned
         self.repo = None
 
-        self.app_id = self._get_deployment_id()
+        self.app_id = App._get_deployment_id()
 
         self.build_time = 0
+
+        # create the app directory
+        self.dir = App.index.make_app_path(self)
 
     @memoized_property
     def services(self):
@@ -53,14 +60,21 @@ class App(object):
             "notebooks_port": 8888
         })
 
-    def _get_deployment_id(self):
-        return str(hash(time.time()))
-
-    def _fetch_repo(self):
-        pass
+    def _fetch_repo(self, repo_path):
+        try:
+            repo_path = os.path.join(self.dir, "repo")
+            cmd = ['git', 'clone', self.repo_url, repo_path]
+            subprocess.check_call(cmd)
+        except subprocess.CalledProcessError as e:
+            print("Could not fetch app repo: {}".format(e))
+            return False
+        return True
 
     def build(self):
         success = True
+
+        # fetch the repo
+        self._fetch_repo()
 
         # clean up the old build
         build_path = os.path.join(self.path, "build")
@@ -90,7 +104,7 @@ class App(object):
             subprocess.check_call(['docker', 'build', '-t', image_name, base_img])
             subprocess.check_call(['docker', 'push', image_name])
         except subprocess.CalledProcessError as e:
-            print("Could not build the base image: {0}".format(e))
+            print("Could not build the base image: {}".format(e))
             success = False
 
         # construct the app image Dockerfile

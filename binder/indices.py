@@ -20,6 +20,9 @@ class AppIndex(object):
     def get_app(self):
         pass
 
+    def make_app_path(self, app):
+        pass
+
     def save_app(self, app):
         pass
 
@@ -51,6 +54,11 @@ class FileAppIndex(AppIndex):
             except IOError as e:
                 print("Could not build app: {0}".format(path))
         return apps
+
+    def make_app_path(self, app):
+        path = os.path.join(self.app_dir, app.name)
+        make_dir(path, clean=True)
+        return path
 
     def save_app(self, app):
         print("app currently must be rebuilt before each launch")
