@@ -1,5 +1,5 @@
-if "POD_SERVER_HOME" not in os.environ:
-    raise Exception("POD_SERVER_HOME environment variable must be set")
+if "BINDER_HOME" not in os.environ:
+    raise Exception("BINDER_HOME environment variable must be set")
 
-ROOT = os.environ["POD_SERVER_HOME"]
+ROOT = os.environ["BINDER_HOME"]
 DOCKER_USER = "andrewosh"

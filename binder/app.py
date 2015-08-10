@@ -60,7 +60,7 @@ class App(object):
             "notebooks_port": 8888
         })
 
-    def _fetch_repo(self, repo_path):
+    def _fetch_repo(self):
         try:
             repo_path = os.path.join(self.dir, "repo")
             cmd = ['git', 'clone', self.repo_url, repo_path]

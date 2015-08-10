@@ -2,6 +2,10 @@
 
 import argparse
 
+from binder.cluster import ClusterManager
+from binder.service import Service
+from binder.app import App
+
 """
 Build section
 """
