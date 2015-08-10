@@ -2,7 +2,9 @@
 
 [![Join the chat at https://gitter.im/binder-project/binder](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/binder-project/binder?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-A system for deploying a collection of Jupyter notebooks and their dependencies across one or more nodes of a Kubernetes cluster.
+A system for deploying a collection of Jupyter notebooks and their dependencies as live, interactive notebooks, straight from GitHub repositories, across one or more nodes of a Kubernetes cluster. 
+
+See discussion on the [Jupyter mailing list](https://groups.google.com/forum/#!topic/jupyter/2DjI5sZa8tI).
 
 **WIP** and under very active development. We will add full deployment instructions (and a test demo) soon. Definitely reach out if you'd like to get involved!
 
@@ -32,7 +34,7 @@ The above step results in a link that, when clicked, will populate template file
 
 - `proxy` : Maintains and registers routes to apps deployed on a cluster
 
-- `modules` : Services that are independent of particular apps and configurable, for example, databases, Spark, etc.
+- `services` : Services that are independent of particular apps and configurable, for example, databases, Spark, etc.
 
 - `binder` : Core utilities and CLI for building, managing, and deploying binders
 
