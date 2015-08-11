@@ -57,7 +57,7 @@ class FileAppIndex(AppIndex):
 
     def make_app_path(self, app):
         path = os.path.join(self.app_dir, app.name)
-        make_dir(path, clean=True)
+        make_dir(path)
         return path
 
     def save_app(self, app):
