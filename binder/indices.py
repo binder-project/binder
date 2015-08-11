@@ -107,7 +107,7 @@ class FileServiceIndex(ServiceIndex):
                         s = {
                             "service": json.load(cf),
                             "path": full_path,
-                            "name": path,
+                            "name": name,
                             "version": version
                         }
                         if os.path.isfile(last_build_path):
