@@ -32,7 +32,7 @@ class App(object):
         self._json = meta["app"]
         self.path = meta["path"]
         self.name = self._json.get("name")
-        self.service_names = self._json.get("services")
+        self.service_names = self._json.get("services", [])
         self.config_scripts = self._json.get("config-scripts")
         self.requirements = self._json.get("requirements")
         self.repo_url = self._json.get("repo")
