@@ -67,14 +67,19 @@ class App(object):
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError as e:
             print("Could not fetch app repo: {}".format(e))
-            return False
-        return True
+            return None
+        return repo_path
 
     def build(self):
         success = True
 
         # fetch the repo
-        self._fetch_repo()
+        repo_path = self._fetch_repo()
+        if repo_path:
+            self.repo = repo_path
+        else:
+            print("Could not fetch app's repository. Aborting build...")
+            return False
 
         # clean up the old build
         build_path = os.path.join(self.path, "build")
