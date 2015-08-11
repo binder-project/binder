@@ -1,6 +1,6 @@
 {
   "name": "spark-worker",
-  "image": {{component.image_name}},
+  "image": {{component.image-name}},
   "ports": [
     {
       "hostPort": {{service.worker-port}},

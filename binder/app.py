@@ -107,7 +107,7 @@ class App(object):
         print "Building base image..."
         try:
             base_img = os.path.join(images_path, "base")
-            image_name = DOCKER_USER + "/" + "generic-base"
+            image_name = DOCKER_USER + "/" + "binder-base"
             subprocess.check_call(['docker', 'build', '-t', image_name, base_img])
             subprocess.check_call(['docker', 'push', image_name])
         except subprocess.CalledProcessError as e:

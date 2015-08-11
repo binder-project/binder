@@ -1,6 +1,6 @@
 {
   "name": "spark-master",
-  "image": "{{component.image_name}}:latest",
+  "image": "{{component.image-name}}:latest",
   "env": [
     {
       "name": "SPARK_MASTER_PORT",

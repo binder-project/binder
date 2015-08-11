@@ -1,6 +1,6 @@
 {
   "name": "spark-master",
-  "image": {{component.image_name}},
+  "image": {{component.image-name}},
   "command": [
     "start-master.sh"
   ],
