@@ -12,7 +12,7 @@ See discussion on the [Jupyter mailing list](https://groups.google.com/forum/#!t
 - Provide "one-click" deployment straight from a GitHub repo to interactive Jupyter notebooks
 - Support a variety of custom dependencies with simple configuration
 - Support custom external services, like databases 
-- Focus on the reproducibility of science and analytics
+- Focused on the reproducibility of science and analytics
 
 ### Overview
 
