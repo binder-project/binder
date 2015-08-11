@@ -113,9 +113,9 @@ class FileServiceIndex(ServiceIndex):
                         if os.path.isfile(last_build_path):
                             with open(last_build_path, 'r') as lbf:
                                 s["last_build"] = json.load(lbf)
-                        services[path + '-' + version] = s
+                        services[name + '-' + version] = s
                 except IOError:
-                    print("Could not build service: {0}".format(path + "-" + version))
+                    print("Could not build service: {0}".format(name + "-" + version))
         return services
 
     def save_service(self, service):
