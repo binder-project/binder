@@ -56,8 +56,8 @@ class App(object):
         return namespace_params("app", {
             "name": self.name,
             "id": self.app_id,
-            "notebooks_image": DOCKER_USER + "/" + self.name,
-            "notebooks_port": 8888
+            "notebooks-image": DOCKER_USER + "/" + self.name,
+            "notebooks-port": 8888
         })
 
     def _fetch_repo(self):
