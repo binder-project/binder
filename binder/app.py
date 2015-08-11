@@ -63,6 +63,8 @@ class App(object):
     def _fetch_repo(self):
         try:
             repo_path = os.path.join(self.dir, "repo")
+            if os.path.isdir(repo_path):
+                shutil.rmtree(repo_path)
             cmd = ['git', 'clone', self.repo_url, repo_path]
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError as e:
