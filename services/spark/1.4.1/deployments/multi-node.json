@@ -5,7 +5,7 @@
         {
           "type": "controller",
           "parameters": {
-            "num_replicas": "5"
+            "num-replicas": "5"
           }
         }
       ]
