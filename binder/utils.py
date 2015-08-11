@@ -32,6 +32,9 @@ def fill_template(template_path, params):
         print("Could not fill template {0}: {1}".format(template_path, e))
 
 def make_dir(path, clean=False):
-    if os.path.isdir(path) and clean:
-        shutil.rmtree(path)
-    os.mkdir(path)
+    if os.path.isdir(path):
+        if clean:
+            shutil.rmtree(path)
+            os.mkdir(path)
+    else:
+        os.mkdir(path)
