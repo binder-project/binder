@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y python-dev python-pip git  && apt-get c
 RUN apt-get install -y nodejs-legacy npm
 
 # install proxy
-RUN git clone https://github.com/jupyter/configurable-http-proxy.git
+RUN git clone https://github.com/andrewosh/configurable-http-proxy.git
 RUN npm install -g configurable-http-proxy/
 
 RUN useradd -m -s /bin/bash main

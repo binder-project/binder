@@ -28,6 +28,27 @@
             "containerPort": 8001
           }
         ]
+      },
+      {
+        "name": "proxy-db"
+        "image": "andrewosh/proxy-mongodb",
+        "volumeMounts": [
+          {
+            "name": "proxy-route-storage",
+            "mountPath": "/data/db"
+          }
+        ],
+        "ports": [
+          {
+           "containerPort": 27017
+          }
+        ]
+      }
+    ],
+    "volumes": [
+      {
+        "name": "proxy-route-storage",
+        "emptyDir": {}
       }
     ]
   }
