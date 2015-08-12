@@ -203,6 +203,7 @@ class KubernetesManager(ClusterManager):
             return False
 
     def start(self, num_minions=3, provider="gce"):
+        self.provider = provider
         success = True
         try:
             # start the cluster
@@ -233,7 +234,6 @@ class KubernetesManager(ClusterManager):
             success = False
 
         if success:
-            self.provider = provider
             print("Started Kubernetes cluster successfully")
         else:
             print("Could not launch the Kubernetes cluster")
