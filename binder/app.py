@@ -62,26 +62,22 @@ class App(object):
 
     def _fetch_repo(self):
         try:
+            cmd = ['git', 'clone', self.repo_url, repo_path]
             repo_path = os.path.join(self.dir, "repo")
             if os.path.isdir(repo_path):
                 shutil.rmtree(repo_path)
-            cmd = ['git', 'clone', self.repo_url, repo_path]
             subprocess.check_call(cmd)
+            self.repo = repo_path
+            return True
         except subprocess.CalledProcessError as e:
             print("Could not fetch app repo: {}".format(e))
-            return None
-        return repo_path
+            return False
 
     def build(self):
         success = True
 
         # fetch the repo
-        repo_path = self._fetch_repo()
-        if repo_path:
-            self.repo = repo_path
-        else:
-            print("Could not fetch app's repository. Aborting build...")
-            return False
+        success = success and self._fetch_repo()
 
         # clean up the old build
         build_path = os.path.join(self.path, "build")
@@ -90,7 +86,7 @@ class App(object):
         # ensure that the service dependencies are all build
         print "Building service dependencies..."
         for service in self.services:
-            service.build()
+            success = success and service.build()
 
         # copy new file and replace all template placeholders with parameters
         print "Copying files and filling templates..."

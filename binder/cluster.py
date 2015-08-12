@@ -6,7 +6,9 @@ import subprocess
 import time
 import requests
 
-from binder.settings import ROOT
+from memoized_property import memoized_property
+
+from binder.settings import ROOT, DOCKER_USER
 from binder.utils import fill_template_string
 
 
@@ -44,6 +46,20 @@ class ClusterManager(object):
 
 
 class KubernetesManager(ClusterManager):
+
+    def __init__(self):
+        # set when the cluster is launched
+        self.provider = None
+
+    @memoized_property
+    def kubernetes_home(self):
+        try:
+            cmd = ["which", "kubectl.sh"]
+            output = subprocess.check_output(cmd)
+            return output.split("/cluster/kubectl.sh")[0]
+        except subprocess.CalledProcessError as e:
+            print("Could not get Kubernetes home: {}".format(e))
+            return None
 
     def _generate_auth_token(self):
         return str(hash(time.time()))
@@ -147,7 +163,47 @@ class KubernetesManager(ClusterManager):
 
         return False
 
+    def _preload_base_image(self):
+
+        if self.provider == 'gce':
+
+            # get zone info
+            zone = os.environ["KUBE_GCE_ZONE"]
+            if not zone:
+                zone_re = re.compile("ZONE\=\$\{KUBE_GCE_ZONE:\-(?P<zone>.*)\}")
+                with open(os.path.join(self.kubernetes_home, "cluster/gce/config-default.sh"), 'r') as f:
+                    m = zone_re.search(f.read())
+                    if m:
+                        zone = m.group("zone")
+                    else:
+                        print("zone could not be determined")
+            if not zone:
+                return False
+
+            try:
+                nodes_cmd = ["kubectl.sh", "get", "nodes"]
+                output = subprocess.check_output(nodes_cmd)
+                for line in output.split('\n')[1:]:
+                    node_name = line.split()[0]
+                    docker_cmd = "docker pull {}/binder-base".format(DOCKER_USER)
+                    cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
+                           "--command", "'{}'".format(docker_cmd)]
+                    subprocess.check_call(cmd)
+                    return True
+            except subprocess.CalledProcessError as e:
+                print("Could not preload the base image on the workers")
+                return False
+
+        elif self.provider == 'aws':
+            # TODO support aws
+            pass
+
+        else:
+            print("Only aws and gce providers are currently supported")
+            return False
+
     def start(self, num_minions=3, provider="gce"):
+        success = True
         try:
             # start the cluster
             os.environ["NUM_MINIONS"] = str(num_minions)
@@ -157,7 +213,6 @@ class KubernetesManager(ClusterManager):
             # generate an auth token and launch the proxy server
             token = self._generate_auth_token()
             self._launch_proxy_server(token)
-
             num_retries = 5
             for i in range(num_retries):
                 print("Sleeping for 20s before getting proxy URL")
@@ -167,14 +222,22 @@ class KubernetesManager(ClusterManager):
                     print("proxy_url: {}".format(proxy_url))
                     # record the proxy url and auth token
                     self._write_proxy_info(proxy_url, token)
-                    return True
+            if not proxy_url:
+                success = False
+                print("Could not obtain the proxy server's URL. Cluster launch unsuccessful")
 
-            print("Could not obtain the proxy server's URL. Cluster launch unsuccessful")
-            return False
+            # preload the generic base image onto all the workers
+            success = success and self._preload_base_image()
 
         except subprocess.CalledProcessError as e:
+            success = False
+
+        if success:
+            self.provider = provider
+            print("Started Kubernetes cluster successfully")
+        else:
             print("Could not launch the Kubernetes cluster")
-            return False
+        return success
 
     def stop(self, provider="gce"):
         try:
