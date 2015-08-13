@@ -168,7 +168,7 @@ class KubernetesManager(ClusterManager):
         if self.provider == 'gce':
 
             # get zone info
-            zone = os.environ["KUBE_GCE_ZONE"]
+            zone = os.environ.get("KUBE_GCE_ZONE")
             if not zone:
                 zone_re = re.compile("ZONE\=\$\{KUBE_GCE_ZONE:\-(?P<zone>.*)\}")
                 with open(os.path.join(self.kubernetes_home, "cluster/gce/config-default.sh"), 'r') as f:
