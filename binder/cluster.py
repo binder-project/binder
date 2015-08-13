@@ -187,7 +187,7 @@ class KubernetesManager(ClusterManager):
                     node_name = line.split()[0]
                     docker_cmd = "sudo docker pull {}/binder-base".format(DOCKER_USER)
                     cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
-                           "--command", "'{}'".format(docker_cmd)]
+                           "--command", "{}".format(docker_cmd)]
                     subprocess.check_call(cmd)
                     return True
             except subprocess.CalledProcessError as e:
