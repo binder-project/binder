@@ -195,7 +195,7 @@ class KubernetesManager(ClusterManager):
 
         return False
 
-    def _preload_base_image(self):
+    def preload_image(self, image_name):
 
         if self.provider == 'gce':
 
@@ -217,13 +217,13 @@ class KubernetesManager(ClusterManager):
                 output = subprocess.check_output(nodes_cmd)
                 for line in output.split('\n')[1:]:
                     node_name = line.split()[0]
-                    docker_cmd = "sudo docker pull {}/binder-base".format(REGISTRY_NAME)
+                    docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
                     cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
                            "--command", "{}".format(docker_cmd)]
                     subprocess.check_call(cmd)
                     return True
             except subprocess.CalledProcessError as e:
-                print("Could not preload the base image on the workers")
+                print("Could not preload image {} onto the workers".format(image_name))
                 return False
 
         elif self.provider == 'aws':
@@ -298,7 +298,7 @@ class KubernetesManager(ClusterManager):
 
             # preload the generic base image onto all the workers
             print("Preloading binder-base image onto all nodes...")
-            success = success and self._preload_base_image()
+            success = success and self.preload_image("binder-base")
 
         except subprocess.CalledProcessError as e:
             success = False

@@ -152,6 +152,9 @@ class App(object):
             success = False
 
         # if preload is set, send the app image to all nodes
+        if preload:
+            print("Preloading app image onto all nodes...")
+            cm = ClusterManager.get_instance().preload_image(self.name)
 
         if success:
             print("Successfully built app: {0}".format(self.name))
