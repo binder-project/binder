@@ -1,2 +1,3 @@
 memoized_property
 flask
+git+https://github.com/uqfoundation/pathos

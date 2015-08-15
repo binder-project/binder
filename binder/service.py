@@ -90,7 +90,8 @@ class Service(object):
                     image_name = REGISTRY_NAME + "/" + self.full_name + "-" + image["name"]
                     image_path = os.path.join(build_path, "images", image["name"])
                     subprocess.check_call(['docker', 'build', '-t', image_name, image_path])
-                    subprocess.check_call(['docker', 'push', image_name])
+                    print("Squashing and pushing {} to private registry...".format(image_name))
+                    subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
                 except subprocess.CalledProcessError as e:
                     success = False
 

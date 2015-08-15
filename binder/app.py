@@ -105,7 +105,8 @@ class App(object):
             base_img = os.path.join(images_path, "base")
             image_name = REGISTRY_NAME + "/" + "binder-base"
             subprocess.check_call(['docker', 'build', '-t', image_name, base_img])
-            subprocess.check_call(['docker', 'push', image_name])
+            print("Squashing and pushing {} to private registry...".format(image_name))
+            subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
         except subprocess.CalledProcessError as e:
             print("Could not build the base image: {}".format(e))
             success = False
@@ -146,7 +147,8 @@ class App(object):
             app_img = app_img_path
             image_name = REGISTRY_NAME + "/" + self.name
             subprocess.check_call(['docker', 'build', '-t', image_name, app_img])
-            subprocess.check_call([os.path.join(ROOT, "util/squash-and-push"), image_name])
+            print("Squashing and pushing {} to private registry...".format(image_name))
+            subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
         except subprocess.CalledProcessError as e:
             print("Could not build the app image: {0}".format(self.name))
             success = False

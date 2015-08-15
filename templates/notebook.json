@@ -18,7 +18,7 @@
         }
       ],
       "command": ["/home/main/start-notebook.sh", "--ip='*'", "--port={{app.notebooks-port}}",
-                "--NotebookApp.base-url='/{{app.id}}'", "--debug"]
+                "--NotebookApp.base_url='/{{app.id}}'", "--debug"]
     }]
   }
 }

@@ -5,8 +5,10 @@ import shutil
 import subprocess
 import time
 import requests
+from urlparse import urljoin
 
 from memoized_property import memoized_property
+from pathos.multiprocessing import Pool
 
 from binder.settings import ROOT, REGISTRY_NAME, DOCKER_HUB_USER
 from binder.utils import fill_template_string
@@ -47,9 +49,7 @@ class ClusterManager(object):
 
 class KubernetesManager(ClusterManager):
 
-    def __init__(self):
-        # set when the cluster is launched
-        self.provider = None
+    pool = Pool(5)
 
     @memoized_property
     def kubernetes_home(self):
@@ -72,6 +72,7 @@ class KubernetesManager(ClusterManager):
                 cmd.append('--namespace={0}'.format(namespace))
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError as e:
+            print("Could not deploy specification: {0} on Kubernetes cluster: {1}".format(path, e))
             success = False
         return success
 
@@ -94,6 +95,9 @@ class KubernetesManager(ClusterManager):
     def _get_registry_url(self):
         return self.__get_service_url("registry")
 
+    def _get_lookup_url(self):
+        return self.__get_service_url("proxy-lookup")
+
     def _get_pod_ip(self, app_id):
         try:
             cmd = ["kubectl.sh", "describe", "pod", "notebook-server", "--namespace={}".format(app_id)]
@@ -106,14 +110,6 @@ class KubernetesManager(ClusterManager):
             return m.group("ip").strip()
         except subprocess.CalledProcessError as e:
             return None
-
-    def _create(self, path):
-        try:
-            subprocess.check_call(["kubectl.sh", "create", "-f", path])
-            return True
-        except subprocess.CalledProcessError as e:
-            print("Could not deploy specification: {} on Kubernetes cluster".format(path))
-            return False
 
     def _launch_registry_server(self):
         registry_path = os.path.join(ROOT, "registry")
@@ -184,12 +180,15 @@ class KubernetesManager(ClusterManager):
                 h = {"Authorization": "token {}".format(token)}
                 proxy_url = base_url + "/" + app_id
                 print("body: {}, headers: {}, proxy_url: {}".format(body, h, proxy_url))
-                r = requests.post(proxy_url, data=json.dumps(body), headers=h)
-                if r.status_code == 201:
-                    print("Proxying {} to {}".format(proxy_url, ip + ":8888"))
-                    return True
-                else:
-                    raise Exception("could not register route with proxy server")
+                try:
+                    r = requests.post(proxy_url, data=json.dumps(body), headers=h)
+                    if r.status_code == 201:
+                        print("Proxying {} to {}".format(proxy_url, ip + ":8888"))
+                        return True
+                    else:
+                        raise Exception("could not register route with proxy server")
+                except requests.exceptions.ConnectionError:
+                    pass
             print("App not yet assigned an IP address. Waiting for {} seconds...".format(pause))
             time.sleep(pause)
 
@@ -197,7 +196,9 @@ class KubernetesManager(ClusterManager):
 
     def preload_image(self, image_name):
 
-        if self.provider == 'gce':
+        provider = os.environ["KUBERNETES_PROVIDER"]
+
+        if provider == 'gce':
 
             # get zone info
             zone = os.environ.get("KUBE_GCE_ZONE")
@@ -212,21 +213,31 @@ class KubernetesManager(ClusterManager):
             if not zone:
                 return False
 
-            try:
-                nodes_cmd = ["kubectl.sh", "get", "nodes"]
-                output = subprocess.check_output(nodes_cmd)
-                for line in output.split('\n')[1:]:
-                    node_name = line.split()[0]
-                    docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
-                    cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
-                           "--command", "{}".format(docker_cmd)]
-                    subprocess.check_call(cmd)
-                    return True
-            except subprocess.CalledProcessError as e:
-                print("Could not preload image {} onto the workers".format(image_name))
-                return False
+            nodes_cmd = ["kubectl.sh", "get", "nodes"]
+            output = subprocess.check_output(nodes_cmd)
+            nodes = output.split("\n")[1:]
 
-        elif self.provider == 'aws':
+            def preload(node):
+                import subprocess
+                try:
+                    split = node.split()
+                    if len(split) > 0:
+                        node_name = split[0]
+                        print("Preloading {0} onto {1}...".format(image_name, node_name))
+                        docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
+                        cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
+                               "--command", "{}".format(docker_cmd)]
+                        subprocess.check_call(cmd)
+                        return True
+                except subprocess.CalledProcessError:
+                    return False
+
+            # TODO better error handling here
+            KubernetesManager.pool.map(preload, nodes)
+            print("Preloaded image {} onto all nodes".format(image_name))
+            return True
+
+        elif provider == 'aws':
             # TODO support aws
             pass
 
@@ -246,6 +257,7 @@ class KubernetesManager(ClusterManager):
                 print("proxy_url: {}".format(proxy_url))
                 # record the proxy url and auth token
                 self._write_proxy_info(proxy_url, token)
+                break
         if not proxy_url:
             print("Could not obtain the proxy server's URL. Cluster launch unsuccessful")
             return False
@@ -262,6 +274,7 @@ class KubernetesManager(ClusterManager):
                 print("registry_url: {}".format(registry_url))
                 # record the registry url 
                 self._write_registry_url(registry_url)
+                break
         if not registry_url:
             print("Could not obtain the registry server's URL. Cluster launch unsuccessful")
             return False
@@ -278,7 +291,6 @@ class KubernetesManager(ClusterManager):
             return False
 
     def start(self, num_minions=3, provider="gce"):
-        self.provider = provider
         success = True
         try:
             # start the cluster
@@ -332,11 +344,13 @@ class KubernetesManager(ClusterManager):
         for f in os.listdir(app_dir):
             if f != "namespace.json":
                 path = os.path.join(app_dir, f)
-                success = self._create(path, namespace=app_id)
+                success = success and self._create(path, namespace=app_id)
                 if not success:
                     print("Could not deploy {0} on Kubernetes cluster".format(path))
 
         # create a route in the proxy
-        success = self._register_proxy_route(app_id)
+        success = success and self._register_proxy_route(app_id)
+        lookup_url = "http://" + self._get_lookup_url()
+        print("Access app at: \n   {}".format(urljoin(lookup_url, app_id)))
 
         return success

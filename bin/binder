@@ -138,6 +138,21 @@ def handle_cluster(args):
     elif args.subcmd == "stop":
         ClusterManager.get_instance().stop()
 
+"""
+Preload section
+"""
+
+def _preload_subparser(parser):
+    p = parser.add_parser("preload", description="Preload apps and services onto the cluster")
+    s = p.add_subparsers(dest="subcmd")
+
+    app = s.add_parser("app")
+    app.add_argument("name", help="Name of app to preload", type=str)
+
+def handle_preload(args):
+    if args.subcmd == "app":
+        ClusterManager.get_instance().preload_image(args.name)
+
 choices = {
     "list": {
         "parser": _list_subparser,
@@ -158,6 +173,10 @@ choices = {
     "cluster": {
         "parser": _cluster_subparser,
         "handler": handle_cluster
+    },
+    "preload": {
+        "parser": _preload_subparser,
+        "handler": handle_preload
     }
 }
 
