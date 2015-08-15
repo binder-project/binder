@@ -168,6 +168,20 @@ class KubernetesManager(ClusterManager):
         with open(os.path.join(ROOT, ".registry_info"), "w+") as registry_file:
             registry_file.write("{}\n".format(url))
 
+    def _remove_proxy_route(self, app_id):
+        base_url, token = self._read_proxy_info()
+        h = {"Authorization": "token {}".format(token)}
+        proxy_url = base_url + "/" + app_id
+        try:
+            r = requests.delete(proxy_url, headers=h)
+            print r
+            if r.status_code == 204:
+                print("Removed proxy route for {}".format(app_id))
+                return True
+        except requests.exceptions.ConnectionError:
+            print("Could not remove proxy route for {}".format(app_id))
+        return False
+
     def _register_proxy_route(self, app_id):
         num_retries = 20
         pause = 5
@@ -354,3 +368,15 @@ class KubernetesManager(ClusterManager):
         print("Access app at: \n   {}".format(urljoin(lookup_url, app_id)))
 
         return success
+
+    def stop_app(self, app_id):
+        try:
+            stop_cmd = ["kubectl.sh", "stop", "pods,services,replicationControllers", "--all",
+                   "--namespace={}".format(app_id)]
+            cleanup_cmd = ["kubectl.sh", "delete", "namespace", app_id]
+            subprocess.check_call(stop_cmd)
+            subprocess.check_call(cleanup_cmd)
+            self._remove_proxy_route(app_id)
+            print("Stopped app {}".format(app_id))
+        except subprocess.CalledProcessError as e:
+            print("Could not stop app {}".format(app_id))

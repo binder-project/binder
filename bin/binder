@@ -153,6 +153,21 @@ def handle_preload(args):
     if args.subcmd == "app":
         ClusterManager.get_instance().preload_image(args.name)
 
+"""
+Stop section
+"""
+
+def _stop_subparser(parser):
+    p = parser.add_parser("stop", description="Stop running apps")
+    s = p.add_subparsers(dest="subcmd")
+
+    app = s.add_parser("app")
+    app.add_argument("id", help="ID of running app to stop", type=str)
+
+def handle_stop(args):
+    if args.subcmd == "app":
+        ClusterManager.get_instance().stop_app(args.id)
+
 choices = {
     "list": {
         "parser": _list_subparser,
@@ -177,6 +192,10 @@ choices = {
     "preload": {
         "parser": _preload_subparser,
         "handler": handle_preload
+    },
+    "stop": {
+        "parser": _stop_subparser,
+        "handler": handle_stop
     }
 }
 
