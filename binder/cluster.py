@@ -111,7 +111,7 @@ class KubernetesManager(ClusterManager):
         try:
             subprocess.check_call(["kubectl.sh", "create", "-f", path])
             return True
-        except subprocess.CalledProcessException as e:
+        except subprocess.CalledProcessError as e:
             print("Could not deploy specification: {} on Kubernetes cluster".format(path))
             return False
 
@@ -255,8 +255,8 @@ class KubernetesManager(ClusterManager):
         self._launch_registry_server()
         num_retries = 5
         for i in range(num_retries):
-            print("Sleeping for 5s before getting registry URL")
-            time.sleep(5)
+            print("Sleeping for 20s before getting registry URL")
+            time.sleep(20)
             registry_url = self._get_registry_url()
             if registry_url:
                 print("registry_url: {}".format(registry_url))
@@ -273,7 +273,7 @@ class KubernetesManager(ClusterManager):
                 "{}/binder-base".format(REGISTRY_NAME)])
             subprocess.check_call(["docker", "push", "{}/binder-base".format(REGISTRY_NAME)])
             return True
-        except subprocess.CalledProcessException as e:
+        except subprocess.CalledProcessError as e:
             print("Could not preload registry server with binder-base image: {}".format(e))
             return False
 

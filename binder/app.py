@@ -62,8 +62,8 @@ class App(object):
 
     def _fetch_repo(self):
         try:
-            cmd = ['git', 'clone', self.repo_url, repo_path]
             repo_path = os.path.join(self.dir, "repo")
+            cmd = ['git', 'clone', self.repo_url, repo_path]
             if os.path.isdir(repo_path):
                 shutil.rmtree(repo_path)
             subprocess.check_call(cmd)
@@ -73,7 +73,7 @@ class App(object):
             print("Could not fetch app repo: {}".format(e))
             return False
 
-    def build(self):
+    def build(self, preload=False):
         success = True
 
         # fetch the repo
@@ -146,10 +146,12 @@ class App(object):
             app_img = app_img_path
             image_name = REGISTRY_NAME + "/" + self.name
             subprocess.check_call(['docker', 'build', '-t', image_name, app_img])
-            subprocess.check_call(['docker', 'push', image_name])
+            subprocess.check_call([os.path.join(ROOT, "util/squash-and-push"), image_name])
         except subprocess.CalledProcessError as e:
             print("Could not build the app image: {0}".format(self.name))
             success = False
+
+        # if preload is set, send the app image to all nodes
 
         if success:
             print("Successfully built app: {0}".format(self.name))

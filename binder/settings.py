@@ -5,4 +5,4 @@ if "BINDER_HOME" not in os.environ:
 
 ROOT = os.environ["BINDER_HOME"]
 DOCKER_HUB_USER = "andrewosh"
-REGISTRY_NAME = "registry"
+REGISTRY_NAME = "gcr.io/generic-notebooks"
