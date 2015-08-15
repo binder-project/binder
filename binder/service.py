@@ -5,7 +5,7 @@ import subprocess
 
 from memoized_property import memoized_property
 
-from binder.settings import ROOT, DOCKER_USER
+from binder.settings import ROOT, REGISTRY_NAME
 from binder.utils import fill_template_string, fill_template, namespace_params, make_dir
 from binder.indices import ServiceIndex
 
@@ -87,7 +87,7 @@ class Service(object):
             # now that all templates are filled, build/upload images
             for image in self.images:
                 try:
-                    image_name = DOCKER_USER + "/" + self.full_name + "-" + image["name"]
+                    image_name = REGISTRY_NAME + "/" + self.full_name + "-" + image["name"]
                     image_path = os.path.join(build_path, "images", image["name"])
                     subprocess.check_call(['docker', 'build', '-t', image_name, image_path])
                     subprocess.check_call(['docker', 'push', image_name])
@@ -130,7 +130,7 @@ class Service(object):
 
                 # TODO: perhaps this should be done in a cleaner way?
                 dep_params["name"] = comp_name
-                dep_params["image-name"] = DOCKER_USER + "/" + self.full_name + "-" + comp_name
+                dep_params["image-name"] = REGISTRY_NAME + "/" + self.full_name + "-" + comp_name
 
                 final_params = dict(service_params.items() + namespace_params("component", dep_params).items())
                 print("final_params: {0}".format(final_params))

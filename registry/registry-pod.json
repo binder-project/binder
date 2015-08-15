@@ -1,0 +1,41 @@
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "registry-server",
+    "labels": {
+      "name": "registry-server"
+    }
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "registry-server",
+        "image": "registry:2",
+        "env": [
+          {
+            "name": "REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY",
+            "value": "/data/registry"
+          }
+        ],
+        "ports": [
+          {
+            "containerPort": 5000
+          }
+        ],
+        "volumeMounts": [
+          {
+            "name": "registry-storage",
+            "mountPath": "/data/registry"
+          }
+        ]
+      }
+    ],
+    "volumes": [
+      {
+        "name": "registry-storage",
+        "emptyDir": {}
+      }
+    ]
+  }
+}

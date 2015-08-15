@@ -5,7 +5,7 @@ import time
 
 from memoized_property import memoized_property
 
-from binder.settings import ROOT, DOCKER_USER
+from binder.settings import ROOT, REGISTRY_NAME
 from binder.utils import namespace_params, fill_template, fill_template_string, make_dir
 from binder.cluster import ClusterManager
 from binder.indices import AppIndex
@@ -56,7 +56,7 @@ class App(object):
         return namespace_params("app", {
             "name": self.name,
             "id": self.app_id,
-            "notebooks-image": DOCKER_USER + "/" + self.name,
+            "notebooks-image": REGISTRY_NAME + "/" + self.name,
             "notebooks-port": 8888
         })
 
@@ -103,7 +103,7 @@ class App(object):
         print "Building base image..."
         try:
             base_img = os.path.join(images_path, "base")
-            image_name = DOCKER_USER + "/" + "binder-base"
+            image_name = REGISTRY_NAME + "/" + "binder-base"
             subprocess.check_call(['docker', 'build', '-t', image_name, base_img])
             subprocess.check_call(['docker', 'push', image_name])
         except subprocess.CalledProcessError as e:
@@ -144,7 +144,7 @@ class App(object):
         # build the app image
         try:
             app_img = app_img_path
-            image_name = DOCKER_USER + "/" + self.name
+            image_name = REGISTRY_NAME + "/" + self.name
             subprocess.check_call(['docker', 'build', '-t', image_name, app_img])
             subprocess.check_call(['docker', 'push', image_name])
         except subprocess.CalledProcessError as e:

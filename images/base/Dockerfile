@@ -25,13 +25,17 @@ WORKDIR $HOME
 USER root
 
 # Install node.js and python dependencies
-RUN apt-get install -y nodejs-legacy npm python-virtualenv python-pip gcc
+RUN apt-get install -y nodejs-legacy npm python-virtualenv python-pip gcc && apt-get clean
 RUN pip install --upgrade setuptools pip
 
 # Install Anaconda and Jupyter
 RUN wget https://3230d63b5fc54e62148e-c95ac804525aac4b6dba79b00b39d1d3.ssl.cf1.rackcdn.com/Anaconda-2.3.0-Linux-x86_64.sh
 RUN bash Anaconda-2.3.0-Linux-x86_64.sh -b
 ENV PATH $HOME/anaconda/bin:$PATH
+
+# Do cleanup
+RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN rm Anaconda-2.3.0-Linux-x86_64.sh
 
 # ADD profile_default /home/main/.ipython/profile_default
 ADD templates/ /srv/templates/

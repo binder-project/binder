@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "proxy-server",
-        "image": "andrewosh/proxy-server",
+        "image": "andrewosh/proxy-server:latest",
         "env": [
           {
             "name": "CONFIGPROXY_AUTH_TOKEN",
@@ -30,8 +30,8 @@
         ]
       },
       {
-        "name": "proxy-db"
-        "image": "andrewosh/proxy-mongodb",
+        "name": "proxy-db",
+        "image": "andrewosh/proxy-mongodb:latest",
         "volumeMounts": [
           {
             "name": "proxy-route-storage",
