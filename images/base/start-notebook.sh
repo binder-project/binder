@@ -1,2 +1,6 @@
 #!/bin/bash
-ipython notebook "$@"
+$OPTS=""
+if [ -f index.ipynb ]; then
+  OPTS="$OPTS --NotebookApp.default_url=/tree/index.ipynb "
+fi
+ipython notebook $OPTS "$@"

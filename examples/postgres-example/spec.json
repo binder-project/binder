@@ -1,5 +1,5 @@
 {
-  "name": "codeneuro-notebooks",
+  "name": "postgres-example",
   "repo": "https://github.com/binder-project/single-service-example",
   "notebooks": "repo/",
   "services": [
