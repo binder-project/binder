@@ -7,11 +7,12 @@ import time
 import requests
 from urlparse import urljoin
 from datetime import datetime, timedelta
+from crontab import CronTab
 
 from memoized_property import memoized_property
 from pathos.multiprocessing import Pool
 
-from binder.settings import ROOT, REGISTRY_NAME, DOCKER_HUB_USER
+from binder.settings import ROOT, REGISTRY_NAME, DOCKER_HUB_USER, APP_CRON_PERIOD
 from binder.utils import fill_template_string
 
 
@@ -343,6 +344,13 @@ class KubernetesManager(ClusterManager):
             print("Preloading binder-base image onto all nodes...")
             success = success and self.preload_image("binder-base")
 
+            # start the inactive app removal cron job
+            cron = CronTab()
+            job = cron.new(command=os.path.join(ROOT, "util", "stop-inactive-apps"), comment="binder-stop")
+            job.minute.every(APP_CRON_PERIOD)
+            job.enable(True)
+            cron.write_to_user(user=True)
+
         except subprocess.CalledProcessError as e:
             success = False
 
@@ -356,6 +364,15 @@ class KubernetesManager(ClusterManager):
         try:
             os.environ["KUBERNETES_PROVIDER"] = provider
             subprocess.check_call(['kube-down.sh'])
+
+            # start the inactive app removal cron job
+            cron = CronTab()
+            jobs = cron.find_comment("binder-stop")
+            for job in jobs:
+                job.enable(False)
+                cron.remove(job)
+            cron.write_to_user(user=True)
+
         except subprocess.CalledProcessError as e:
             print("Could not destroy the Kubernetes cluster")
 

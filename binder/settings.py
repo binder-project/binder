@@ -10,3 +10,5 @@ REGISTRY_NAME = "gcr.io/generic-notebooks"
 
 LOG_FILE = "/var/log/binder"
 LOG_LEVEL = logging.INFO
+
+APP_CRON_PERIOD = 5

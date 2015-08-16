@@ -1,3 +1,4 @@
 memoized_property
+python-crontab
 flask
 git+https://github.com/uqfoundation/pathos
