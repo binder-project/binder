@@ -16,6 +16,11 @@ class App(object):
 
     index = AppIndex.get_index(ROOT)
 
+    class BuildState(object):
+        BUILDING = "BUILDING"
+        COMPLETE = "COMPLETE"
+        FAILED = "FAILED"
+
     @staticmethod
     def get_app(name=None):
         apps = App.index.find_apps()
@@ -85,32 +90,32 @@ class App(object):
         app_img_path = os.path.join(build_path, "app")
         repo_df_path = os.path.join(app_img_path, self._json["dockerfile"])
         final_df_path = os.path.join(app_img_path, "Dockerfile")
-        with open(final_df_path, "a+") as final_df:
+        with open(final_df_path, "w+") as final_df:
             with open(repo_df_path, "r") as repo_df:
 
                 def filter_from(line):
                     if line.startswith("FROM "):
                         # TODO very crude base image check
-                        if not line.endswith("/binder-base"):
+                        if not line.strip().endswith("/binder-base"):
                             print("Dockerfile base image is not binder-base. Building may fail.")
                         return False
                     return True
 
-                lines = df.readlines()
+                lines = repo_df.readlines()
                 no_from = filter(lambda line: filter_from(line), lines)
 
                 # write the actual base image (with corrected registry)
                 final_lines = ["FROM {}".format(self._get_base_image_name())] + no_from
 
                 for line in final_lines:
-                    final_df_path.write(line)
+                    final_df.write(line)
 
         shutil.move(final_df_path, repo_df_path)
 
         # build the app image
         try:
             image_name = self._get_image_name()
-            subprocess.check_call(['docker', 'build', '-t', image_name, "repo"])
+            subprocess.check_call(['docker', 'build', '-t', image_name, os.path.join(app_img_path, "repo")])
             return True
         except subprocess.CalledProcessError as e:
             print("Could not build the app image: {0}".format(self.name))
@@ -166,9 +171,10 @@ class App(object):
         # fetch the repo
         success = success and self._fetch_repo()
 
-        # clean up the old build
+        # clean up the old build and record the start of a new build
         build_path = os.path.join(self.path, "build")
-        make_dir(os.path.join(self.path, "build"), clean=True)
+        make_dir(build_path, clean=True)
+        App.index.update_build_state(self, App.BuildState.BUILDING)
 
         # ensure that the service dependencies are all build
         print "Building service dependencies..."
@@ -222,6 +228,9 @@ class App(object):
 
         if success:
             print("Successfully built app: {0}".format(self.name))
+            App.index.update_build_state(self, App.BuildState.COMPLETE)
+        else:
+            App.index.update_build_state(self, App.BuildState.FAILED)
 
     def deploy(self, mode):
         # every service must be deployable in single-node mode, so this is valid even if there

@@ -1,5 +1,7 @@
 import json
 import os
+import tempfile
+import shutil
 
 from binder.utils import make_dir
 
@@ -21,6 +23,9 @@ class AppIndex(object):
         pass
 
     def make_app_path(self, app):
+        pass
+
+    def update_build_state(self, app, state):
         pass
 
     def save_app(self, app):
@@ -55,10 +60,19 @@ class FileAppIndex(AppIndex):
                 print("Could not build app: {0}".format(path))
         return apps
 
+    def get_app_path(self, app):
+        return os.path.join(self.app_dir, app.name)
+
     def make_app_path(self, app):
-        path = os.path.join(self.app_dir, app.name)
+        path = self.get_app_path(app)
         make_dir(path)
         return path
+
+    def update_build_state(self, app, state):
+        state_file = tempfile.NamedTemporaryFile(delete=False)
+        state_file.write(json.dumps({"build_state": state})+"\n")
+        state_file.close()
+        shutil.move(state_file.name, os.path.join(self.get_app_path(app), "build", ".build_state"))
 
     def save_app(self, app):
         print("app currently must be rebuilt before each launch")
