@@ -1,6 +1,3 @@
-# Add the notebooks directory
-ADD {{notebooks}} $HOME/notebooks
-
 WORKDIR $HOME/notebooks
 
 USER root

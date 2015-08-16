@@ -140,8 +140,12 @@ class App(object):
                 app.write(client)
                 app.write("\n")
 
-            # add the notebooks to the app image and set the default command
-            nb_img_path = os.path.join(build_path, "add_notebooks")
+            if "notebooks" in self._json:
+                app.write("ADD {0} $HOME/notebooks\n".format(self._json["notebooks"]))
+                app.write("\n")
+
+            # write suffix lines to the app image
+            nb_img_path = os.path.join(build_path, "suffix")
             with open(os.path.join(nb_img_path, "Dockerfile"), 'r') as nb_img:
                 for line in nb_img.readlines():
                     app.write(line)

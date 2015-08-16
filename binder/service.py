@@ -99,10 +99,13 @@ class Service(object):
                 print("Successfully build {0}".format(self.full_name))
                 # write latest build parameters
                 self.index.save_service(self)
+                return True
             else:
                 print("Failed to build {0}".format(self.full_name))
+                return False
         else:
             print("Image {0} not changed since last build. Not rebuilding.".format(self.full_name))
+            return True
 
     def deploy(self, mode, deploy_path, app, templates):
         """

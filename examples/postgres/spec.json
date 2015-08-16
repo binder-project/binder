@@ -1,0 +1,11 @@
+{
+  "name": "codeneuro-notebooks",
+  "repo": "https://github.com/binder-project/single-service-example",
+  "notebooks": "repo/",
+  "services": [
+    {
+      "name": "postgres",
+      "version": "9.4"
+    }
+  ]
+}
