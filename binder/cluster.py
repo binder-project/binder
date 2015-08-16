@@ -6,6 +6,7 @@ import subprocess
 import time
 import requests
 from urlparse import urljoin
+from datetime import datetime, timedelta
 
 from memoized_property import memoized_property
 from pathos.multiprocessing import Pool
@@ -168,13 +169,29 @@ class KubernetesManager(ClusterManager):
         with open(os.path.join(ROOT, ".registry_info"), "w+") as registry_file:
             registry_file.write("{}\n".format(url))
 
+    def _get_inactive_routes(self, min_inactive):
+        now = datetime.utcnow()
+        threshold = (now - timedelta(minutes=min_inactive)).isoformat()
+
+        base_url, token = self._read_proxy_info()
+        h = {"Authorization": "token {}".format(token)}
+        proxy_url = base_url + "?inactive_since={}".format(threshold)
+        print("proxy_url: {}".format(proxy_url))
+        try:
+            r = requests.get(proxy_url, headers=h)
+            if r.status_code == 200:
+                routes = r.json().keys()
+                return map(lambda r: r[1:], routes)
+        except requests.exceptions.ConnectionError:
+            print("Could not get all routes inactive for {} minutes".format(min_inactive))
+        return None
+
     def _remove_proxy_route(self, app_id):
         base_url, token = self._read_proxy_info()
         h = {"Authorization": "token {}".format(token)}
         proxy_url = base_url + "/" + app_id
         try:
             r = requests.delete(proxy_url, headers=h)
-            print r
             if r.status_code == 204:
                 print("Removed proxy route for {}".format(app_id))
                 return True
@@ -380,3 +397,15 @@ class KubernetesManager(ClusterManager):
             print("Stopped app {}".format(app_id))
         except subprocess.CalledProcessError as e:
             print("Could not stop app {}".format(app_id))
+
+    def stop_inactive_apps(self, min_inactive):
+        routes = self._get_inactive_routes(min_inactive)
+        if not routes:
+            print("No inactive apps to stop")
+            return
+        for app_id in routes:
+            print("Stopping inactive app {}".format(app_id))
+            self.stop_app(app_id)
+
+
+

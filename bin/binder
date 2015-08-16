@@ -162,11 +162,16 @@ def _stop_subparser(parser):
     s = p.add_subparsers(dest="subcmd")
 
     app = s.add_parser("app")
-    app.add_argument("id", help="ID of running app to stop", type=str)
+    app.add_argument("--id", required=False, help="ID of running app to stop", type=str)
+    app.add_argument("--inactive-since", dest="inactive", required=False, type=int,
+                     help="Stop all apps that have been inactive for this amount of time.")
 
 def handle_stop(args):
     if args.subcmd == "app":
-        ClusterManager.get_instance().stop_app(args.id)
+        if args.id:
+            ClusterManager.get_instance().stop_app(args.id)
+        elif args.inactive:
+            ClusterManager.get_instance().stop_inactive_apps(args.inactive)
 
 choices = {
     "list": {
