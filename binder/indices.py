@@ -19,6 +19,9 @@ class AppIndex(object):
             AppIndex._singleton = FileAppIndex(*args, **kwargs)
         return AppIndex._singleton
 
+    def create(self, spec):
+        pass
+
     def get_app(self):
         pass
 
@@ -26,6 +29,9 @@ class AppIndex(object):
         pass
 
     def update_build_state(self, app, state):
+        pass
+
+    def get_build_state(self, app):
         pass
 
     def save_app(self, app):
@@ -37,16 +43,16 @@ class FileAppIndex(AppIndex):
     Finds/manages apps by searching for a certain directory structure in a directory hierarchy
     """
 
-    APP_DIR = "apps"
+    APPS_DIR = "apps"
 
     def __init__(self, root):
-        self.app_dir = os.path.join(root, self.APP_DIR)
-        make_dir(self.app_dir)
+        self.apps_dir = os.path.join(root, self.APPS_DIR)
+        make_dir(self.apps_dir)
 
     def find_apps(self):
         apps = {}
-        for path in os.listdir(self.app_dir):
-            app_path = os.path.join(self.app_dir, path)
+        for path in os.listdir(self.apps_dir):
+            app_path = os.path.join(self.apps_dir, path)
             spec_path = os.path.join(app_path, "spec.json")
             try:
                 with open(spec_path, 'r') as sf:
@@ -60,8 +66,14 @@ class FileAppIndex(AppIndex):
                 print("Could not build app: {0}".format(path))
         return apps
 
+    def create(self, spec):
+        app_path = os.path.join(self.apps_dir, spec["name"])
+        make_dir(app_path)
+        with open(os.path.join(app_path, "spec.json"), "a+") as spec_file:
+            spec_file.write(json.dumps(spec))
+
     def get_app_path(self, app):
-        return os.path.join(self.app_dir, app.name)
+        return os.path.join(self.apps_dir, app.name)
 
     def make_app_path(self, app):
         path = self.get_app_path(app)
@@ -73,6 +85,12 @@ class FileAppIndex(AppIndex):
         state_file.write(json.dumps({"build_state": state})+"\n")
         state_file.close()
         shutil.move(state_file.name, os.path.join(self.get_app_path(app), "build", ".build_state"))
+
+    def get_build_state(self, app):
+        path = os.path.join(self.get_app_path(app), "build", ".build_state")
+        with open(path, "r") as state_file:
+            json = json.loads(state_file.read())
+            return json["build_state"]
 
     def save_app(self, app):
         print("app currently must be rebuilt before each launch")

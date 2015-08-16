@@ -1,6 +1,7 @@
 import shutil
 import os
 import re
+import settings
 
 def namespace_params(ns, params):
     ns_params = {}
@@ -38,3 +39,15 @@ def make_dir(path, clean=False):
             os.mkdir(path)
     else:
         os.mkdir(path)
+
+def get_binder_home():
+    import binder
+    return "/".join(binder.__file__.split("/")[:-1])
+
+def get_env_string():
+    env = [
+        "BINDER_HOME={}".format(settings.ROOT),
+        "KUBERNETES_PROVIDER={}".format(os.environ["KUBERNETES_PROVIDER"]),
+        "PYTHONPATH=$PYTHONPATH:{}".format(get_binder_home())
+    ]
+    return " ".join(env)

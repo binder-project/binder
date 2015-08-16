@@ -13,7 +13,7 @@ from memoized_property import memoized_property
 from pathos.multiprocessing import Pool
 
 from binder.settings import ROOT, REGISTRY_NAME, DOCKER_HUB_USER, APP_CRON_PERIOD
-from binder.utils import fill_template_string
+from binder.utils import fill_template_string, get_env_string
 
 
 class ClusterManager(object):
@@ -346,7 +346,9 @@ class KubernetesManager(ClusterManager):
 
             # start the inactive app removal cron job
             cron = CronTab()
-            job = cron.new(command=os.path.join(ROOT, "util", "stop-inactive-apps"), comment="binder-stop")
+            cmd = " ".join([get_env_string(), os.path.join(ROOT, "util", "stop-inactive-apps"),
+                            "&>/tmp/binder-cron"])
+            job = cron.new(cmd, comment="binder-stop")
             job.minute.every(APP_CRON_PERIOD)
             job.enable(True)
             cron.write_to_user(user=True)
@@ -398,10 +400,13 @@ class KubernetesManager(ClusterManager):
 
         # create a route in the proxy
         success = success and self._register_proxy_route(app_id)
-        lookup_url = "http://" + self._get_lookup_url()
-        print("Access app at: \n   {}".format(urljoin(lookup_url, app_id)))
+        if not success:
+            return None
 
-        return success
+        lookup_url = "http://" + self._get_lookup_url()
+        app_url = urljoin(lookup_url, app_id)
+        print("Access app at: \n   {}".format(app_url))
+        return app_url
 
     def stop_app(self, app_id):
         try:

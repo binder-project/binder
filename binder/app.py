@@ -18,7 +18,7 @@ class App(object):
 
     class BuildState(object):
         BUILDING = "BUILDING"
-        COMPLETE = "COMPLETE"
+        COMPLETED = "COMPLETED"
         FAILED = "FAILED"
 
     @staticmethod
@@ -28,6 +28,10 @@ class App(object):
         if not name:
             return [App(a) for a in apps.values()]
         return App(apps.get(name))
+
+    @staticmethod
+    def create(spec):
+        App.index.create(spec)
 
     @staticmethod
     def _get_deployment_id():
@@ -55,6 +59,10 @@ class App(object):
     @memoized_property
     def services(self):
         return [Service.get_service(s_json["name"], s_json["version"]) for s_json in self.service_names]
+
+    @property
+    def build_state(self):
+        return App.index.get_build_state(self)
 
     def get_app_params(self):
         # TODO some of these should be moved into some sort of a Defaults class (config file?)
@@ -228,7 +236,7 @@ class App(object):
 
         if success:
             print("Successfully built app: {0}".format(self.name))
-            App.index.update_build_state(self, App.BuildState.COMPLETE)
+            App.index.update_build_state(self, App.BuildState.COMPLETED)
         else:
             App.index.update_build_state(self, App.BuildState.FAILED)
 
@@ -275,15 +283,17 @@ class App(object):
                 success = False
 
         # use the cluster manager to deploy each file in the deploy/ folder
-        deployed_app = ClusterManager.get_instance().deploy_app(self.app_id, deploy_path)
-        if not deployed_app:
+        redirect_url = ClusterManager.get_instance().deploy_app(self.app_id, deploy_path)
+        if not redirect_url:
             success = False
 
         if success:
             app_id = app_params["app.id"]
             print("Successfully deployed app {0} in {1} mode with ID {2}".format(self.name, mode, app_id))
+            return redirect_url
         else:
             print("Failed to deploy app {0} in {1} mode.".format(self.name, mode))
+            return None
 
     def destroy(self):
         pass
