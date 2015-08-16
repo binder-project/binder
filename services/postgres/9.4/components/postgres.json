@@ -1,0 +1,10 @@
+{
+  "name": "postgres",
+  "image": "{{component.image-name}}:latest",
+  "ports": [
+    {
+      "name": "port",
+      "containerPort": {{service.port}}
+    }
+  ]
+}

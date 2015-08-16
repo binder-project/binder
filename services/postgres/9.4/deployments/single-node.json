@@ -1,0 +1,19 @@
+{
+  "components": [
+    {
+     "name": "postgres",
+     "deployments": [
+       {
+         "type": "pod"
+       },
+       {
+         "type": "service",
+         "parameters": {
+           "service-port": {{service.port}},
+           "port": {{service.port}}
+         }
+       }
+     ]
+    }
+  ]
+}

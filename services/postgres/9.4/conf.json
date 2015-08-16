@@ -1,0 +1,12 @@
+{
+  "parameters": {
+    "port": "5432"
+  },
+  "client": "client.conf",
+  "images":[
+    {
+      "name": "postgres",
+      "dir": "postgres"
+    }
+  ]
+}
