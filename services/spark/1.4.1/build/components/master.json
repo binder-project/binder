@@ -21,10 +21,5 @@
       "containerPort": {{service.web-ui-port}}
     }
   ],
-  "resources": {
-    "limits": {
-      "cpu": "100m"
-    }
-  },
   "command": ["./start.sh"]
 }

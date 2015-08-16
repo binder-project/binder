@@ -73,48 +73,53 @@ class App(object):
             print("Could not fetch app repo: {}".format(e))
             return False
 
-    def build(self, preload=False):
-        success = True
+    def _get_base_image_name(self):
+        return REGISTRY_NAME + "/" + "binder-base"
 
-        # fetch the repo
-        success = success and self._fetch_repo()
+    def _get_image_name(self):
+        return REGISTRY_NAME + "/" + self.name
 
-        # clean up the old build
-        build_path = os.path.join(self.path, "build")
-        make_dir(os.path.join(self.path, "build"), clean=True)
-
-        # ensure that the service dependencies are all build
-        print "Building service dependencies..."
-        for service in self.services:
-            success = success and service.build()
-
-        # copy new file and replace all template placeholders with parameters
-        print "Copying files and filling templates..."
-        images_path = os.path.join(ROOT, "images")
-        for img in os.listdir(images_path):
-            img_path = os.path.join(images_path, img)
-            bd_path = os.path.join(build_path, img)
-            shutil.copytree(img_path, bd_path)
-            for root, dirs, files in os.walk(bd_path):
-                for f in files:
-                    fill_template(os.path.join(root, f), self._json)
-
-        # make sure the base image is built
-        print "Building base image..."
-        try:
-            base_img = os.path.join(images_path, "base")
-            image_name = REGISTRY_NAME + "/" + "binder-base"
-            subprocess.check_call(['docker', 'build', '-t', image_name, base_img])
-            print("Squashing and pushing {} to private registry...".format(image_name))
-            subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
-        except subprocess.CalledProcessError as e:
-            print("Could not build the base image: {}".format(e))
-            success = False
-
-        # construct the app image Dockerfile
-        print "Building app image..."
+    def _build_with_dockerfile(self, build_path):
+        # build the app image from the repository's Dockerfile
+        print("Building the app image with Dockerfile...")
         app_img_path = os.path.join(build_path, "app")
-        shutil.copytree(self.repo, os.path.join(app_img_path, "repo"))
+        repo_df_path = os.path.join(app_img_path, self._json["dockerfile"])
+        final_df_path = os.path.join(app_img_path, "Dockerfile")
+        with open(final_df_path, "a+") as final_df:
+            with open(repo_df_path, "r") as repo_df:
+
+                def filter_from(line):
+                    if line.startswith("FROM "):
+                        # TODO very crude base image check
+                        if not line.endswith("/binder-base"):
+                            print("Dockerfile base image is not binder-base. Building may fail.")
+                        return False
+                    return True
+
+                lines = df.readlines()
+                no_from = filter(lambda line: filter_from(line), lines)
+
+                # write the actual base image (with corrected registry)
+                final_lines = ["FROM {}".format(self._get_base_image_name())] + no_from
+
+                for line in final_lines:
+                    final_df_path.write(line)
+
+        shutil.move(final_df_path, repo_df_path)
+
+        # build the app image
+        try:
+            image_name = self._get_image_name()
+            subprocess.check_call(['docker', 'build', '-t', image_name, "repo"])
+            return True
+        except subprocess.CalledProcessError as e:
+            print("Could not build the app image: {0}".format(self.name))
+            return False
+
+    def _build_without_dockerfile(self, build_path):
+        # construct the app image Dockerfile
+        app_img_path = os.path.join(build_path, "app")
+        print("Building app image without Dockerfile...")
         with open(os.path.join(app_img_path, "Dockerfile"), 'a+') as app:
 
             if "config_scripts" in self._json:
@@ -144,13 +149,66 @@ class App(object):
 
         # build the app image
         try:
-            app_img = app_img_path
-            image_name = REGISTRY_NAME + "/" + self.name
-            subprocess.check_call(['docker', 'build', '-t', image_name, app_img])
+            image_name = self._get_image_name()
+            subprocess.check_call(['docker', 'build', '-t', image_name, app_img_path])
+            return True
+        except subprocess.CalledProcessError as e:
+            print("Could not build the app image: {0}".format(self.name))
+            return False
+
+    def build(self, build_base=False, preload=False):
+        success = True
+
+        # fetch the repo
+        success = success and self._fetch_repo()
+
+        # clean up the old build
+        build_path = os.path.join(self.path, "build")
+        make_dir(os.path.join(self.path, "build"), clean=True)
+
+        # ensure that the service dependencies are all build
+        print "Building service dependencies..."
+        for service in self.services:
+            success = success and service.build()
+
+        # copy new file and replace all template placeholders with parameters
+        print "Copying files and filling templates..."
+        images_path = os.path.join(ROOT, "images")
+        for img in os.listdir(images_path):
+            img_path = os.path.join(images_path, img)
+            bd_path = os.path.join(build_path, img)
+            shutil.copytree(img_path, bd_path)
+            for root, dirs, files in os.walk(bd_path):
+                for f in files:
+                    fill_template(os.path.join(root, f), self._json)
+
+        if build_base:
+            # make sure the base image is built
+            print "Building base image..."
+            try:
+                base_img = os.path.join(images_path, "base")
+                image_name = self._get_base_image_name()
+                subprocess.check_call(['docker', 'build', '-t', image_name, base_img])
+                print("Squashing and pushing {} to private registry...".format(image_name))
+                subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
+            except subprocess.CalledProcessError as e:
+                print("Could not build the base image: {}".format(e))
+                success = False
+
+        app_img_path = os.path.join(build_path, "app")
+        shutil.copytree(self.repo, os.path.join(app_img_path, "repo"))
+        if "dockerfile" in self._json:
+            success = success and self._build_with_dockerfile(build_path)
+        else:
+            success = success and self._build_without_dockerfile(build_path)
+
+        # push the app image to the private registry
+        try:
+            image_name = self._get_image_name()
             print("Squashing and pushing {} to private registry...".format(image_name))
             subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
         except subprocess.CalledProcessError as e:
-            print("Could not build the app image: {0}".format(self.name))
+            print("Could not push {0} to the private registry".format(self.name))
             success = False
 
         # if preload is set, send the app image to all nodes
@@ -162,6 +220,11 @@ class App(object):
             print("Successfully built app: {0}".format(self.name))
 
     def deploy(self, mode):
+        # every service must be deployable in single-node mode, so this is valid even if there
+        # aren't any services
+        if not mode:
+            mode = "single-node"
+
         success = True
 
         # clean up the old deployment

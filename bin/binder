@@ -105,7 +105,8 @@ def _deploy_subparser(parser):
 
     app = s.add_parser("app")
     app.add_argument("name", help="Name of app to deply", type=str)
-    app.add_argument("mode", help="Deployment mode (i.e. 'single-mode', 'multi-node',...)" , type=str)
+    app.add_argument("--mode", dest="mode", required=False,
+                     help="Deployment mode (i.e. 'single-mode', 'multi-node',...)", type=str)
 
 """
 Upload section

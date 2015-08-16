@@ -1,1 +1,0 @@
-{"images": [{"name": "master", "dir": "master"}, {"name": "worker", "dir": "worker"}], "parameters": {"app_ui_port": "4040", "web_ui_port": "8080", "worker_port": "8888", "master_port": "7077"}}
