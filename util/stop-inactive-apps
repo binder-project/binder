@@ -1,0 +1,2 @@
+#!/bin/bash
+binder stop app --inactive-since 60
