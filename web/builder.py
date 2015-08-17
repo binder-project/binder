@@ -2,6 +2,7 @@ from threading import Thread
 from pathos.multiprocessing import Pool
 import sys
 import os
+import Queue
 
 from binder.app import App
 
@@ -13,6 +14,7 @@ def build_app(spec, preload=False):
 class Builder(Thread):
 
     NUM_WORKERS = 10
+    GET_TIMEOUT = 2
 
     def __init__(self, queue, preload):
         super(Builder, self).__init__()
@@ -30,7 +32,10 @@ class Builder(Thread):
 
     def run(self):
         while not self._stopped:
-            next_job = self._build_queue.get()
-            print("Got job: {}".format(next_job))
-            self._build(next_job)
+            try:
+                next_job = self._build_queue.get(timeout=Builder.GET_TIMEOUT)
+                print("Got job: {}".format(next_job))
+                self._build(next_job)
+            except Queue.Empty:
+                pass
 

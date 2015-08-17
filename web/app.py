@@ -1,6 +1,7 @@
 from multiprocessing import Pool
 import Queue
 import json
+import signal
 
 from tornado import gen
 from tornado.ioloop import IOLoop
@@ -17,10 +18,21 @@ PORT = 8080
 NUM_WORKERS = 10
 PRELOAD = True
 QUEUE_SIZE = 50
+ALLOW_ORIGIN = True
 
 build_queue = Queue.Queue(QUEUE_SIZE)
 
-class BuildHandler(RequestHandler):
+class BinderHandler(RequestHandler):
+
+    def get(self):
+        if ALLOW_ORIGIN:
+            self.set_header('Access-Control-Allow-Origin', '*')
+
+    def post(self):
+        if ALLOW_ORIGIN:
+            self.set_header('Access-Control-Allow-Origin', '*')
+
+class BuildHandler(BinderHandler):
 
     def _is_malformed(self, spec):
         # by default, there aren't any required fields in an app specification
@@ -40,6 +52,7 @@ class GithubHandler(BuildHandler):
     def get(self, organization, repo):
         # if the app is still building, return an error. If the app is built, deploy it and return
         # the redirect url
+        super(GithubHandler, self).get()
         app_name = self._make_app_name(organization, repo)
         app = App.get_app(app_name)
         if not app:
@@ -56,6 +69,7 @@ class GithubHandler(BuildHandler):
 
     def post(self, organization, repo):
         # if the spec is properly formed, create/build the app
+        super(GithubHandler, self).post()
         print("request.body: {}".format(self.request.body))
         spec = json.loads(self.request.body)
         if self._is_malformed(spec):
@@ -77,17 +91,27 @@ class OtherSourceHandler(BuildHandler):
     def post(self, app_id):
         pass
 
-class ServicesHandler(RequestHandler):
+class ServicesHandler(BinderHandler):
 
     def get(self):
+        super(ServicesHandler, self).get()
         services = Service.get_service()
         self.write({"services": [service.full_name for service in services]})
 
-class AppsHandler(RequestHandler):
+class AppsHandler(BinderHandler):
 
     def get(self):
+        super(AppsHandler, self).get()
         apps = App.get_app()
         self.write({"apps": [app.name for app in apps]})
+
+def sig_handler(sig, frame):
+    IOLoop.instance().add_callback(shutdown)
+
+def shutdown():
+    print("Shutting down...")
+    IOLoop.instance().stop()
+    builder.stop()
 
 def main():
 
@@ -95,10 +119,13 @@ def main():
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubHandler),
         (r"/apps/(?P<app_id>.+)", OtherSourceHandler),
         (r"/services", ServicesHandler),
-        (r"/apps", AppsHandler),
-        (r"/", MainPageHandler)
+        (r"/apps", AppsHandler)
     ], debug=True)
 
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
+
+    global builder
     builder = Builder(build_queue, PRELOAD)
     builder.start()
 
