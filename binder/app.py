@@ -44,8 +44,7 @@ class App(object):
         self.path = meta["path"]
         self.name = self._json.get("name")
         self.service_names = self._json.get("services", [])
-        self.config_scripts = self._json.get("config-scripts")
-        self.requirements = self._json.get("requirements")
+        self.dependencies = map(lambda d: d.lower(), self._json.get("dependencies", []))
         self.repo_url = self._json.get("repo")
 
         # set once the repo is cloned
@@ -137,10 +136,12 @@ class App(object):
         print("Building app image without Dockerfile...")
         with open(os.path.join(app_img_path, "Dockerfile"), 'a+') as app:
 
-            if "requirements" in self._json:
-                app.write("ADD {0} requirements.txt\n".format(self._json["requirements"]))
-                app.write("RUN pip install -r requirements.txt\n")
-                app.write("\n")
+            for dependency in self.dependencies:
+                # TODO do more modular dependency handling here
+                if dependency == "requirements.txt":
+                    app.write("ADD {0} requirements.txt\n".format(self._json["requirements"]))
+                    app.write("RUN pip install -r requirements.txt\n")
+                    app.write("\n")
 
             # if any services have client code, insert that now
             for service in self.services:
@@ -211,7 +212,7 @@ class App(object):
 
         app_img_path = os.path.join(build_path, "app")
         shutil.copytree(self.repo, os.path.join(app_img_path, "repo"))
-        if "dockerfile" in self._json:
+        if "dockerfile" in self.dependencies:
             success = success and self._build_with_dockerfile(build_path)
         else:
             success = success and self._build_without_dockerfile(build_path)

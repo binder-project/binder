@@ -95,7 +95,8 @@ def main():
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubHandler),
         (r"/apps/(?P<app_id>.+)", OtherSourceHandler),
         (r"/services", ServicesHandler),
-        (r"/apps", AppsHandler)
+        (r"/apps", AppsHandler),
+        (r"/", MainPageHandler)
     ], debug=True)
 
     builder = Builder(build_queue, PRELOAD)

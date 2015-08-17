@@ -31,9 +31,9 @@ def build_app(args):
     apps = App.get_app(name=args.name)
     if isinstance(apps, list):
         for app in apps:
-            app.build(preload=args.p)
+            app.build(preload=args.p, build_base=args.b)
     elif isinstance(apps, App):
-        apps.build(preload=args.p)
+        apps.build(preload=args.p, build_base=args.b)
     else:
         print("App {0} not found".format(apps))
 
@@ -49,6 +49,7 @@ def _build_subparser(parser):
     app = s.add_parser("app")
     app.add_argument("name", help="Name of app to build", type=str)
     app.add_argument("-p", required=False, action="store_true", help="Preload app onto nodes after building")
+    app.add_argument("-b", required=False, action="store_true", help="Build/upload binder-base before building")
 
 
 """
