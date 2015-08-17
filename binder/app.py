@@ -137,12 +137,6 @@ class App(object):
         print("Building app image without Dockerfile...")
         with open(os.path.join(app_img_path, "Dockerfile"), 'a+') as app:
 
-            if "config_scripts" in self._json:
-                for script_path in self._json["config-scripts"]:
-                    with open(os.path.join(app_img_path, script_path), 'r') as script:
-                        app.write(script.read())
-                        app.write("\n")
-
             if "requirements" in self._json:
                 app.write("ADD {0} requirements.txt\n".format(self._json["requirements"]))
                 app.write("RUN pip install -r requirements.txt\n")
