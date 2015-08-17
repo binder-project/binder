@@ -14,6 +14,9 @@ class Service(object):
 
     index = ServiceIndex.get_index(ROOT)
 
+    class BuildFailedException(Exception):
+        pass
+
     @staticmethod
     def get_service(name=None, version=None):
         services = Service.index.find_services()
@@ -69,40 +72,39 @@ class Service(object):
     def build(self):
         # only initiate the build if the current spec is different than the last spec built
         if self._json != self.last_build:
-            success = True
 
-            # clean up the old build
-            build_path = os.path.join(self.path, "build")
-            make_dir(build_path, clean=True)
+            try:
+                # clean up the old build
+                build_path = os.path.join(self.path, "build")
+                make_dir(build_path, clean=True)
 
-            # copy new file and replace all template placeholders with parameters
-            build_dirs = ["components", "deployments", "images"]
-            for bd in build_dirs:
-                bd_path = os.path.join(build_path, bd)
-                shutil.copytree(os.path.join(self.path, bd), bd_path)
-                for root, dirs, files in os.walk(os.path.join(build_path, bd)):
-                    for f in files:
-                        fill_template(os.path.join(root, f), self.parameters)
+                # copy new file and replace all template placeholders with parameters
+                build_dirs = ["components", "deployments", "images"]
+                for bd in build_dirs:
+                    bd_path = os.path.join(build_path, bd)
+                    shutil.copytree(os.path.join(self.path, bd), bd_path)
+                    for root, dirs, files in os.walk(os.path.join(build_path, bd)):
+                        for f in files:
+                            fill_template(os.path.join(root, f), self.parameters)
 
-            # now that all templates are filled, build/upload images
-            for image in self.images:
-                try:
-                    image_name = REGISTRY_NAME + "/" + self.full_name + "-" + image["name"]
-                    image_path = os.path.join(build_path, "images", image["name"])
-                    subprocess.check_call(['docker', 'build', '-t', image_name, image_path])
-                    print("Squashing and pushing {} to private registry...".format(image_name))
-                    subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
-                except subprocess.CalledProcessError as e:
-                    success = False
-
-            if success:
-                print("Successfully build {0}".format(self.full_name))
-                # write latest build parameters
-                self.index.save_service(self)
-                return True
-            else:
-                print("Failed to build {0}".format(self.full_name))
+                # now that all templates are filled, build/upload images
+                for image in self.images:
+                    try:
+                        image_name = REGISTRY_NAME + "/" + self.full_name + "-" + image["name"]
+                        image_path = os.path.join(build_path, "images", image["name"])
+                        subprocess.check_call(['docker', 'build', '-t', image_name, image_path])
+                        print("Squashing and pushing {} to private registry...".format(image_name))
+                        subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
+                    except subprocess.CalledProcessError as e:
+                        raise Service.BuildFailedException("could not build service {0}: {1}".format(self.full_name, e))
+            except Service.BuildFailedException as e:
+                print("could not build service: {0}: {1}".format(self.full_name, e))
                 return False
+
+            print("Successfully built {0}".format(self.full_name))
+            # write latest build parameters
+            self.index.save_service(self)
+            return True
         else:
             print("Image {0} not changed since last build. Not rebuilding.".format(self.full_name))
             return True
