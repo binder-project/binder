@@ -45,7 +45,6 @@ ADD start-notebook.sh /home/main/
 USER root
 RUN chmod a+rX /srv/templates
 RUN chown -R main:main /home/main
-USER main
 
 # Convert notebooks to the current format
 # RUN find . -name '*.ipynb' -exec ipython nbconvert --to notebook {} --output {} \;

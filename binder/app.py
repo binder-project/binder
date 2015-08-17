@@ -88,7 +88,7 @@ class App(object):
             return False
 
     def _get_base_image_name(self):
-        return REGISTRY_NAME + "/" + "binder-base"
+        return REGISTRY_NAME + "/" + "binder-base:latest"
 
     def _get_image_name(self):
         return REGISTRY_NAME + "/" + self.name
@@ -134,7 +134,10 @@ class App(object):
         # construct the app image Dockerfile
         app_img_path = os.path.join(build_path, "app")
         print("Building app image without Dockerfile...")
-        with open(os.path.join(app_img_path, "Dockerfile"), 'a+') as app:
+        with open(os.path.join(app_img_path, "Dockerfile"), 'w+') as app:
+
+            app.write("FROM {}\n".format(self._get_base_image_name()))
+            app.write("\n")
 
             for dependency in self.dependencies:
                 # TODO do more modular dependency handling here
@@ -211,6 +214,7 @@ class App(object):
                 success = False
 
         app_img_path = os.path.join(build_path, "app")
+        make_dir(app_img_path)
         shutil.copytree(self.repo, os.path.join(app_img_path, "repo"))
         if "dockerfile" in self.dependencies:
             success = success and self._build_with_dockerfile(build_path)
