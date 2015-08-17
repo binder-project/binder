@@ -1,5 +1,4 @@
 {
-  "notebooks": "repo/",
   "services": [
     {
       "name": "postgres",

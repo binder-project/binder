@@ -80,7 +80,8 @@ class App(object):
     def _fetch_repo(self):
         try:
             repo_path = os.path.join(self.dir, "repo")
-            cmd = ['GIT_TERMINAL_PROMPT=0', 'git', 'clone', self.repo_url, repo_path]
+            os.environ["GIT_TERMINAL_PROMPT"] = "0"
+            cmd = ['git', 'clone', self.repo_url, repo_path]
             if os.path.isdir(repo_path):
                 shutil.rmtree(repo_path)
             subprocess.check_call(cmd)
@@ -173,9 +174,10 @@ class App(object):
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
 
-    def _build_base_image(self, images_path):
+    def _build_base_image(self):
         # make sure the base image is built
         print "Building base image..."
+        images_path = os.path.join(ROOT, "images")
         try:
             base_img = os.path.join(images_path, "base")
             image_name = self._get_base_image_name()
@@ -186,7 +188,7 @@ class App(object):
             print("Could not build the base image: {}".format(e))
             raise App.BuildFailedException("could not build the base image")
 
-    def _fill_templates(self, images_path, build_path):
+    def _fill_templates(self, build_path):
         print "Copying files and filling templates..."
         images_path = os.path.join(ROOT, "images")
         for img in os.listdir(images_path):
@@ -227,10 +229,10 @@ class App(object):
                     raise App.BuildFailedException("could not build service {}".format(service.full_name))
 
             # copy new file and replace all template placeholders with parameters
-            self._fill_templates(images_path, build_path)
+            self._fill_templates(build_path)
 
             if build_base:
-                self._build_base_image(images_path)
+                self._build_base_image()
 
             app_img_path = os.path.join(build_path, "app")
             make_dir(app_img_path)
