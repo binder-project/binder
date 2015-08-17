@@ -88,7 +88,7 @@ class App(object):
             self.repo = repo_path
         except subprocess.CalledProcessError as e:
             print("Could not fetch app repo: {}".format(e))
-            raise App.BuildFailedError("could not fetch repository")
+            raise App.BuildFailedException("could not fetch repository")
 
     def _get_base_image_name(self):
         return REGISTRY_NAME + "/" + "binder-base:latest"
@@ -130,7 +130,7 @@ class App(object):
             image_name = self._get_image_name()
             subprocess.check_call(['docker', 'build', '-t', image_name, os.path.join(app_img_path, "repo")])
         except subprocess.CalledProcessError as e:
-            raise App.BuildFailedError("could not build app {0}: {1}".format(self.name, e))
+            raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
 
     def _build_without_dockerfile(self, build_path):
         # construct the app image Dockerfile
