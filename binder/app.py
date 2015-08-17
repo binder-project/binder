@@ -77,7 +77,7 @@ class App(object):
     def _fetch_repo(self):
         try:
             repo_path = os.path.join(self.dir, "repo")
-            cmd = ['git', 'clone', self.repo_url, repo_path]
+            cmd = ['GIT_TERMINAL_PROMPT=0', 'git', 'clone', self.repo_url, repo_path]
             if os.path.isdir(repo_path):
                 shutil.rmtree(repo_path)
             subprocess.check_call(cmd)
