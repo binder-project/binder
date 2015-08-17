@@ -12,8 +12,10 @@ from binder.app import App
 
 from .builder import Builder
 
+# TODO move settings into a config file
 PORT = 8080
 NUM_WORKERS = 10
+PRELOAD = True
 QUEUE_SIZE = 50
 
 build_queue = Queue.Queue(QUEUE_SIZE)
@@ -40,7 +42,6 @@ class GithubHandler(BuildHandler):
         # the redirect url
         app_name = self._make_app_name(organization, repo)
         app = App.get_app(app_name)
-        print app
         if not app:
             self.set_status(404)
             self.write({"error": "app does not exist"})
@@ -50,7 +51,7 @@ class GithubHandler(BuildHandler):
             elif app.build_state == App.BuildState.FAILED:
                 self.write({"build_status": "failed"})
             elif app.build_state == App.BuildState.COMPLETED:
-                redirect_url = app.deploy()
+                redirect_url = app.deploy("single-node")
                 self.write({"redirect_url": redirect_url})
 
     def post(self, organization, repo):
@@ -97,12 +98,15 @@ def main():
         (r"/apps", AppsHandler)
     ], debug=True)
 
-    builder = Builder(build_queue)
+    builder = Builder(build_queue, PRELOAD)
     builder.start()
 
     http_server = HTTPServer(application)
     http_server.listen(PORT)
+
+    print("Binder API server running on port {}".format(PORT))
     IOLoop.current().start()
+
 
 if __name__ == "__main__":
     main()

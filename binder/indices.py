@@ -72,7 +72,7 @@ class FileAppIndex(AppIndex):
 
     def create(self, spec):
         app_path = os.path.join(self.apps_dir, spec["name"])
-        make_dir(app_path)
+        make_dir(app_path, clean=True)
         with open(os.path.join(app_path, "spec.json"), "w+") as spec_file:
             spec_file.write(json.dumps(spec))
         m = self._build_meta(spec, app_path)
@@ -94,6 +94,8 @@ class FileAppIndex(AppIndex):
 
     def get_build_state(self, app):
         path = os.path.join(self.get_app_path(app), "build", ".build_state")
+        if not os.path.isfile(path):
+            return None
         with open(path, "r") as state_file:
             state_json = json.loads(state_file.read())
             return state_json["build_state"]
