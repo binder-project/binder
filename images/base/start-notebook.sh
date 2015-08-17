@@ -1,6 +1,9 @@
 #!/bin/bash
-$OPTS=""
-if [ -f $HOME/notebooks/index.ipynb ]; then
+OPTS=""
+echo "$HOME/notebooks/index.ipynb: " $HOME/notebooks/index.ipynb
+if [ -e $HOME/notebooks/index.ipynb ]; then
   OPTS="$OPTS --NotebookApp.default_url=/tree/index.ipynb "
 fi
-ipython notebook $OPTS "$@"
+CMD="$OPTS $@"
+echo "CMD: " $CMD
+ipython notebook $CMD
