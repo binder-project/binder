@@ -46,8 +46,15 @@ class FileAppIndex(AppIndex):
     APPS_DIR = "apps"
 
     def __init__(self, root):
-        self.apps_dir = os.path.join(root, self.APPS_DIR)
+        self.apps_dir = os.path.join(root, FileAppIndex.APPS_DIR)
         make_dir(self.apps_dir)
+
+    def _build_meta(self, spec, path):
+        m = {
+            "app": spec,
+            "path": path,
+        }
+        return m
 
     def find_apps(self):
         apps = {}
@@ -57,10 +64,7 @@ class FileAppIndex(AppIndex):
             try:
                 with open(spec_path, 'r') as sf:
                     spec = json.load(sf)
-                    m = {
-                        "app": spec,
-                        "path": app_path,
-                    }
+                    m = self._build_meta(spec, app_path)
                     apps[spec["name"]] = m
             except IOError as e:
                 print("Could not build app: {0}".format(path))
@@ -69,8 +73,10 @@ class FileAppIndex(AppIndex):
     def create(self, spec):
         app_path = os.path.join(self.apps_dir, spec["name"])
         make_dir(app_path)
-        with open(os.path.join(app_path, "spec.json"), "a+") as spec_file:
+        with open(os.path.join(app_path, "spec.json"), "w+") as spec_file:
             spec_file.write(json.dumps(spec))
+        m = self._build_meta(spec, app_path)
+        return m
 
     def get_app_path(self, app):
         return os.path.join(self.apps_dir, app.name)
@@ -89,8 +95,8 @@ class FileAppIndex(AppIndex):
     def get_build_state(self, app):
         path = os.path.join(self.get_app_path(app), "build", ".build_state")
         with open(path, "r") as state_file:
-            json = json.loads(state_file.read())
-            return json["build_state"]
+            state_json = json.loads(state_file.read())
+            return state_json["build_state"]
 
     def save_app(self, app):
         print("app currently must be rebuilt before each launch")

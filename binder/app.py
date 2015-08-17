@@ -24,14 +24,16 @@ class App(object):
     @staticmethod
     def get_app(name=None):
         apps = App.index.find_apps()
-        print "name: {0}, apps: {1}".format(name, str(apps))
         if not name:
             return [App(a) for a in apps.values()]
-        return App(apps.get(name))
+        app = apps.get(name)
+        if app:
+            return App(apps.get(name))
+        return None
 
     @staticmethod
     def create(spec):
-        App.index.create(spec)
+        return App(App.index.create(spec))
 
     @staticmethod
     def _get_deployment_id():

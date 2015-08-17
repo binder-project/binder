@@ -2,8 +2,8 @@ from multiprocessing import Pool
 import Queue
 import json
 
-import tornado.ioloop
 from tornado import gen
+from tornado.ioloop import IOLoop
 from tornado.web import Application, RequestHandler
 from tornado.httpserver import HTTPServer
 
@@ -17,7 +17,6 @@ NUM_WORKERS = 10
 QUEUE_SIZE = 50
 
 build_queue = Queue.Queue(QUEUE_SIZE)
-builder = Builder()
 
 class BuildHandler(RequestHandler):
 
@@ -41,6 +40,7 @@ class GithubHandler(BuildHandler):
         # the redirect url
         app_name = self._make_app_name(organization, repo)
         app = App.get_app(app_name)
+        print app
         if not app:
             self.set_status(404)
             self.write({"error": "app does not exist"})
@@ -55,6 +55,7 @@ class GithubHandler(BuildHandler):
 
     def post(self, organization, repo):
         # if the spec is properly formed, create/build the app
+        print("request.body: {}".format(self.request.body))
         spec = json.loads(self.request.body)
         if self._is_malformed(spec):
             self.set_status(400)
@@ -76,45 +77,32 @@ class OtherSourceHandler(BuildHandler):
         pass
 
 class ServicesHandler(RequestHandler):
-    def get():
-        pass
+
+    def get(self):
+        services = Service.get_service()
+        self.write({"services": [service.full_name for service in services]})
 
 class AppsHandler(RequestHandler):
-    def get():
-        pass
 
-def github_handler(organization, repo):
-    if request.method == "POST":
-        json = request.get_json()
-        json["name"] = organization + "-" + repo
-        json["repo"] = "https://github.com/{0}/{1}".format(organization, repo)
-    elif request.method == "GET":
-        pass
-
-def other_source_handler(app_id):
-    if request.method == "POST":
-        pass
-    elif request.method == "GET":
-        pass
-
-def services():
-    services = Service.get_service()
-    return jsonify(map(lambda service: service.full_name, services))
-
-def apps():
-    services = Service.get_service()
-    return jsonify(map(lambda service: service.full_name, services))
+    def get(self):
+        apps = App.get_app()
+        self.write({"apps": [app.name for app in apps]})
 
 def main():
+
     application = Application([
-        (r"/apps/(?P<organization>\w+)/(?P<repo>\w+)", GithubHandler),
-        (r"/apps/(?P<app_id>\w+)", OtherSourceHandler),
+        (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubHandler),
+        (r"/apps/(?P<app_id>.+)", OtherSourceHandler),
         (r"/services", ServicesHandler),
         (r"/apps", AppsHandler)
-    ])
+    ], debug=True)
+
+    builder = Builder(build_queue)
     builder.start()
+
     http_server = HTTPServer(application)
     http_server.listen(PORT)
+    IOLoop.current().start()
 
 if __name__ == "__main__":
     main()
