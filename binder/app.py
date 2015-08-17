@@ -213,13 +213,13 @@ class App(object):
      
     def build(self, build_base=False, preload=False):
         try:
-            # fetch the repo
-            self._fetch_repo()
-
             # clean up the old build and record the start of a new build
             build_path = os.path.join(self.path, "build")
             make_dir(build_path, clean=True)
             App.index.update_build_state(self, App.BuildState.BUILDING)
+
+            # fetch the repo
+            self._fetch_repo()
 
             # ensure that the service dependencies are all build
             print "Building service dependencies..."
