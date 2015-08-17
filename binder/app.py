@@ -251,7 +251,7 @@ class App(object):
 
         except App.BuildFailedException as e:
             App.index.update_build_state(self, App.BuildState.FAILED)
-            print("Failed to build app {0}: {1}".format(self.name, e))
+            print(e)
 
         print("Successfully built app {0}".format(self.name))
         App.index.update_build_state(self, App.BuildState.COMPLETED)
