@@ -97,7 +97,8 @@ class App(object):
         # build the app image from the repository's Dockerfile
         print("Building the app image with Dockerfile...")
         app_img_path = os.path.join(build_path, "app")
-        repo_df_path = os.path.join(app_img_path, self._json["dockerfile"])
+        repo_path = os.path.join(app_img_path, "repo")
+        repo_df_path = os.path.join(app_img_path, os.path.join(repo_path, "Dockerfile"))
         final_df_path = os.path.join(app_img_path, "Dockerfile")
         with open(final_df_path, "w+") as final_df:
             with open(repo_df_path, "r") as repo_df:
@@ -133,6 +134,7 @@ class App(object):
     def _build_without_dockerfile(self, build_path):
         # construct the app image Dockerfile
         app_img_path = os.path.join(build_path, "app")
+        repo_path = os.path.join(app_img_path, "repo")
         print("Building app image without Dockerfile...")
         with open(os.path.join(app_img_path, "Dockerfile"), 'w+') as app:
 
@@ -142,7 +144,7 @@ class App(object):
             for dependency in self.dependencies:
                 # TODO do more modular dependency handling here
                 if dependency == "requirements.txt":
-                    app.write("ADD {0} requirements.txt\n".format(self._json["requirements"]))
+                    app.write("ADD {0} requirements.txt\n".format(repo_path))
                     app.write("RUN pip install -r requirements.txt\n")
                     app.write("\n")
 
@@ -153,9 +155,9 @@ class App(object):
                 app.write(client)
                 app.write("\n")
 
-            if "notebooks" in self._json:
-                app.write("ADD {0} $HOME/notebooks\n".format(self._json["notebooks"]))
-                app.write("\n")
+            notebook_path = self._json["notebooks"] if "notebooks" in self._json else repo_path
+            app.write("ADD {0} $HOME/notebooks\n".format(notebook_path))
+            app.write("\n")
 
             # write suffix lines to the app image
             nb_img_path = os.path.join(build_path, "suffix")
