@@ -1,10 +1,28 @@
 from threading import Thread
-from multiprocess import Pool
 import sys
 import os
 import Queue
 
+from multiprocess import pool, Process
+import multiprocessing
+
 from binder.app import App
+
+NUM_WORKERS = 16
+GET_TIMEOUT = 2
+
+# Copied+pasted from http://stackoverflow.com/questions/6974695/python-process-pool-non-daemonic
+# TODO use message queuing system instead of 2 process pools
+class NoDaemonProcess(Process):
+    # make 'daemon' attribute always return False
+    def _get_daemon(self):
+        return False
+    def _set_daemon(self, value):
+        pass
+    daemon = property(_get_daemon, _set_daemon)
+
+class NoDaemonPool(pool.Pool):
+    Process = NoDaemonProcess
 
 def build_app(spec, preload=False):
     new_app = App.create(spec)
@@ -13,27 +31,31 @@ def build_app(spec, preload=False):
 
 class Builder(Thread):
 
-    NUM_WORKERS = 10
-    GET_TIMEOUT = 2
-
     def __init__(self, queue, preload):
         super(Builder, self).__init__()
         self._build_queue = queue
-        self._pool = Pool(processes=Builder.NUM_WORKERS)
+
+        self._pool = NoDaemonPool(processes=NUM_WORKERS) 
+	multiprocessing.freeze_support()
+
         self._stopped = False
         self._preload = preload
 
     def stop(self):
         self._stopped = True
+        self._pool.terminate()
 
     def _build(self, spec):
-        pool = self._pool
-        pool.apply_async(build_app, (spec, self._preload))
+        try:
+            pool = self._pool
+            pool.apply_async(build_app, (spec, self._preload))
+        except Exception as e:
+            print("Exception in _build: {}".format(e))
 
     def run(self):
         while not self._stopped:
             try:
-                next_job = self._build_queue.get(timeout=Builder.GET_TIMEOUT)
+                next_job = self._build_queue.get(timeout=GET_TIMEOUT)
                 print("Got job: {}".format(next_job))
                 self._build(next_job)
             except Queue.Empty:

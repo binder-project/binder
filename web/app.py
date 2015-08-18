@@ -1,4 +1,3 @@
-from multiprocessing import Pool
 import Queue
 import json
 import signal
@@ -45,19 +44,8 @@ class BuildHandler(BinderHandler):
             self.write({"build_status": "failed"})
         elif app.build_state == App.BuildState.COMPLETED:
              self.write({"build_status": "completed"})
-
-
-class GithubStatusHandler(BuildHandler):
-
-    def get(self, organization, repo):
-        super(GithubHandler, self).get()
-        app_name = self._make_app_name(organization, repo)
-        app = App.get_app(app_name)
-        if not app:
-            self.set_status(404)
-            self.write({"error": "app does not exist"})
         else:
-            self._write_build_state(app)
+            self.write({"build_status": "unknown"})
 
 
 class GithubHandler(BuildHandler):
@@ -69,11 +57,11 @@ class GithubHandler(BuildHandler):
     def _make_app_name(self, organization, repo):
         return organization + "-" + repo
 
-    @gen.coroutine
+
+class GithubStatusHandler(GithubHandler):
+
     def get(self, organization, repo):
-        # if the app is still building, return an error. If the app is built, deploy it and return
-        # the redirect url
-        super(GithubHandler, self).get()
+        super(GithubStatusHandler, self).get()
         app_name = self._make_app_name(organization, repo)
         app = App.get_app(app_name)
         if not app:
@@ -81,13 +69,27 @@ class GithubHandler(BuildHandler):
             self.write({"error": "app does not exist"})
         else:
             self._write_build_state(app)
-            if app.build_state == App.BuildState.COMPLETED:
-                redirect_url = app.deploy("single-node")
-                self.write({"redirect_url": redirect_url})
+
+
+class GithubBuildHandler(GithubHandler):
+
+    @gen.coroutine
+    def get(self, organization, repo):
+        # if the app is still building, return an error. If the app is built, deploy it and return
+        # the redirect url
+        super(GithubHandler, self).get()
+        app_name = self._make_app_name(organization, repo)
+        app = App.get_app(app_name)
+        if app and app.build_state == App.BuildState.COMPLETED:
+            redirect_url = app.deploy("single-node")
+            self.write({"redirect_url": redirect_url})
+        else:
+            self.set_status(404)
+            self.write({"error": "no app available to deploy"})
 
     def post(self, organization, repo):
         # if the spec is properly formed, create/build the app
-        super(GithubHandler, self).post()
+        super(GithubBuildHandler, self).post()
         print("request.body: {}".format(self.request.body))
         spec = json.loads(self.request.body)
         if self._is_malformed(spec):
@@ -136,7 +138,7 @@ def main():
 
     application = Application([
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)/status", GithubStatusHandler),
-        (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubHandler),
+        (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubBuildHandler),
         (r"/apps/(?P<app_id>.+)", OtherSourceHandler),
         (r"/services", ServicesHandler),
         (r"/apps", AppsHandler)

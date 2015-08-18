@@ -248,25 +248,24 @@ class KubernetesManager(ClusterManager):
             nodes_cmd = ["kubectl.sh", "get", "nodes"]
             output = subprocess.check_output(nodes_cmd)
             nodes = output.split("\n")[1:]
-
+           
             def preload(node):
-                import subprocess
-                try:
-                    split = node.split()
-                    if len(split) > 0:
-                        node_name = split[0]
-                        if node_name != "kubernetes-master":
-                            print("Preloading {0} onto {1}...".format(image_name, node_name))
-                            docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
-                            cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
-                                   "--command", "{}".format(docker_cmd)]
-                            subprocess.check_call(cmd)
-                        return True
-                except subprocess.CalledProcessError:
-                    return False
-
-            # TODO better error handling here
-            KubernetesManager.pool.map(preload, nodes)
+                split = node.split()
+                if len(split) > 0:
+                    node_name = split[0]
+                    if node_name != "kubernetes-master":
+                        print("Preloading {0} onto {1}...".format(image_name, node_name))
+                        docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
+                        cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
+                               "--command", "{}".format(docker_cmd)]
+                        return subprocess.Popen(cmd)
+                return None
+            
+            procs = [preload(node) for node in nodes]
+            print("Waiting for preloading to finish...")
+            for proc in procs:
+                if proc:
+                    proc.wait()
             print("Preloaded image {} onto all nodes".format(image_name))
             return True
 
