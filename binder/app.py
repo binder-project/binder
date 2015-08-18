@@ -158,7 +158,7 @@ class App(object):
                 app.write(client)
                 app.write("\n")
 
-            notebook_path = self._json["notebooks"] if "notebooks" in self._json else repo_path
+            notebook_path = self._json["notebooks"] if "notebooks" in self._json else "repo"
             app.write("ADD {0} $HOME/notebooks\n".format(notebook_path))
             app.write("\n")
 
