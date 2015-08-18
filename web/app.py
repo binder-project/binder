@@ -38,6 +38,27 @@ class BuildHandler(BinderHandler):
         # by default, there aren't any required fields in an app specification
         pass
 
+    def _write_build_state(self, app):
+        if app.build_state == App.BuildState.BUILDING:
+            self.write({"build_status": "building"})
+        elif app.build_state == App.BuildState.FAILED:
+            self.write({"build_status": "failed"})
+        elif app.build_state == App.BuildState.COMPLETED:
+             self.write({"build_status": "completed"})
+
+
+class GithubStatusHandler(BuildHandler):
+
+    def get(self, organization, repo):
+        super(GithubHandler, self).get()
+        app_name = self._make_app_name(organization, repo)
+        app = App.get_app(app_name)
+        if not app:
+            self.set_status(404)
+            self.write({"error": "app does not exist"})
+        else:
+            self._write_build_state(app)
+
 
 class GithubHandler(BuildHandler):
 
@@ -59,11 +80,8 @@ class GithubHandler(BuildHandler):
             self.set_status(404)
             self.write({"error": "app does not exist"})
         else:
-            if app.build_state == App.BuildState.BUILDING:
-                self.write({"build_status": "building"})
-            elif app.build_state == App.BuildState.FAILED:
-                self.write({"build_status": "failed"})
-            elif app.build_state == App.BuildState.COMPLETED:
+            self._write_build_state(app)
+            if app.build_state == App.BuildState.COMPLETED:
                 redirect_url = app.deploy("single-node")
                 self.write({"redirect_url": redirect_url})
 
@@ -83,6 +101,7 @@ class GithubHandler(BuildHandler):
                 self.write({"success": "app submitted to build queue"})
             except Queue.Full:
                 self.write({"error": "build queue full"})
+
 
 class OtherSourceHandler(BuildHandler):
     def get(self, app_id):
@@ -116,6 +135,7 @@ def shutdown():
 def main():
 
     application = Application([
+        (r"/apps/(?P<organization>.+)/(?P<repo>.+)/status", GithubStatusHandler),
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubHandler),
         (r"/apps/(?P<app_id>.+)", OtherSourceHandler),
         (r"/services", ServicesHandler),
