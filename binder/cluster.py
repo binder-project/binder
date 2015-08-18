@@ -255,11 +255,12 @@ class KubernetesManager(ClusterManager):
                     split = node.split()
                     if len(split) > 0:
                         node_name = split[0]
-                        print("Preloading {0} onto {1}...".format(image_name, node_name))
-                        docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
-                        cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
-                               "--command", "{}".format(docker_cmd)]
-                        subprocess.check_call(cmd)
+                        if node_name != "kubernetes-master":
+                            print("Preloading {0} onto {1}...".format(image_name, node_name))
+                            docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
+                            cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
+                                   "--command", "{}".format(docker_cmd)]
+                            subprocess.check_call(cmd)
                         return True
                 except subprocess.CalledProcessError:
                     return False
