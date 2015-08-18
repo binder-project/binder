@@ -1,4 +1,4 @@
 memoized_property
 python-crontab
 tornado
-git+https://github.com/uqfoundation/pathos
+multiprocess

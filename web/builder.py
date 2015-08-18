@@ -1,5 +1,5 @@
 from threading import Thread
-from pathos.multiprocessing import Pool
+from multiprocess import Pool
 import sys
 import os
 import Queue

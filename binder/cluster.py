@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from crontab import CronTab
 
 from memoized_property import memoized_property
-from pathos.multiprocessing import Pool
+from multiprocess import Pool
 
 from binder.settings import ROOT, REGISTRY_NAME, DOCKER_HUB_USER, APP_CRON_PERIOD
 from binder.utils import fill_template_string, get_env_string
