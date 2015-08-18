@@ -147,7 +147,7 @@ class App(object):
             for dependency in self.dependencies:
                 # TODO do more modular dependency handling here
                 if dependency == "requirements.txt":
-                    app.write("ADD {0} requirements.txt\n".format(repo_path))
+                    app.write("ADD {0} requirements.txt\n".format("repo/requirements.txt")
                     app.write("RUN pip install -r requirements.txt\n")
                     app.write("\n")
 
