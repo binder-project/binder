@@ -42,12 +42,13 @@ ADD templates/ /srv/templates/
 # Add helper script
 ADD start-notebook.sh /home/main/
 
-USER root
 RUN chmod a+rX /srv/templates
 RUN chown -R main:main /home/main
 
 # Convert notebooks to the current format
 # RUN find . -name '*.ipynb' -exec ipython nbconvert --to notebook {} --output {} \;
 # RUN find . -name '*.ipynb' -exec ipython trust {} \;
+
+USER main
 
 ENV SHELL /bin/bash
