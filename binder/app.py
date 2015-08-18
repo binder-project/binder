@@ -4,6 +4,7 @@ import subprocess
 import time
 
 from memoized_property import memoized_property
+import requests
 
 from binder.settings import ROOT, REGISTRY_NAME
 from binder.utils import namespace_params, fill_template, fill_template_string, make_dir
@@ -80,13 +81,14 @@ class App(object):
     def _fetch_repo(self):
         try:
             repo_path = os.path.join(self.dir, "repo")
-            os.environ["GIT_TERMINAL_PROMPT"] = "0"
+            if requests.get(self.repo_url).status_code == 404:
+                raise Exception("repository does not exist")
             cmd = ['git', 'clone', self.repo_url, repo_path]
             if os.path.isdir(repo_path):
                 shutil.rmtree(repo_path)
             subprocess.check_call(cmd)
             self.repo = repo_path
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             print("Could not fetch app repo: {}".format(e))
             raise App.BuildFailedException("could not fetch repository")
 

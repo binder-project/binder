@@ -2,7 +2,10 @@
 
 # update
 apt-get update -y
+apt-get install -y software-properties-common python-software-properties
+add-apt-repository ppa:git-core/ppa
 apt-get install -y git vim python-pip
+
 
 # setup gcloud
 curl https://sdk.cloud.google.com | bash
