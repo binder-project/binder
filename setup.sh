@@ -2,8 +2,7 @@
 
 # update
 apt-get update -y
-apt-get install -y git vim python-pip make wget
-
+apt-get install -y git vim python-pip make wget gcc
 
 # setup gcloud
 curl https://sdk.cloud.google.com | bash
@@ -29,6 +28,11 @@ build/release.sh
 cd ~/binder/
 make install
 pip install -r requirements.txt
+# get multiprocess
+git clone https://github.com/uqfoundation/multiprocess
+cd multiprocess
+python setup.py build
+python setup.py install
 
 # configure binder environment variables
 echo "export BINDER_HOME=~/binder" >> ~/.bashrc
