@@ -98,7 +98,7 @@ class KubernetesManager(ClusterManager):
         return self.__get_service_url("registry")
 
     def _get_lookup_url(self):
-        return self.__get_service_url("proxy-lookup")
+        return "http://app.mybinder.org"
 
     def _get_pod_ip(self, app_id):
         try:
