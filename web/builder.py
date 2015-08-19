@@ -25,9 +25,13 @@ class NoDaemonPool(pool.Pool):
     Process = NoDaemonProcess
 
 def build_app(spec, preload=False):
+    name = spec["name"]
+    app = App.get_app(name)
+    if app and app.build_state == App.BuildState.BUILDING:
+        print("App {} already building. Wait for build to complete before resubmitting.".format(name))
+        return
     new_app = App.create(spec)
-    if new_app and new_app.build_state != App.BuildState.BUILDING:
-        new_app.build(preload=preload)
+    new_app.build(preload=preload)
 
 class Builder(Thread):
 
@@ -36,7 +40,7 @@ class Builder(Thread):
         self._build_queue = queue
 
         self._pool = NoDaemonPool(processes=NUM_WORKERS) 
-	multiprocessing.freeze_support()
+        multiprocessing.freeze_support()
 
         self._stopped = False
         self._preload = preload
