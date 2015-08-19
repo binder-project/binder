@@ -18,6 +18,8 @@ from binder.utils import fill_template_string, get_env_string
 
 class ClusterManager(object):
 
+    CLUSTER_HOST = "http://app.mybinder.org"
+
     # the singleton manager
     manager = None
 
@@ -98,7 +100,7 @@ class KubernetesManager(ClusterManager):
         return self.__get_service_url("registry")
 
     def _get_lookup_url(self):
-        return "http://app.mybinder.org"
+        return ClusterManager.CLUSTER_HOST
 
     def _get_pod_ip(self, app_id):
         try:
@@ -403,7 +405,7 @@ class KubernetesManager(ClusterManager):
         if not success:
             return None
 
-        lookup_url = "http://" + self._get_lookup_url()
+        lookup_url = self._get_lookup_url()
         app_url = urljoin(lookup_url, app_id)
         print("Access app at: \n   {}".format(app_url))
         return app_url
