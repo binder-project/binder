@@ -201,8 +201,8 @@ class KubernetesManager(ClusterManager):
         return False
 
     def _register_proxy_route(self, app_id):
-        num_retries = 20
-        pause = 5
+        num_retries = 30
+        pause = 1
         for i in range(num_retries):
             # TODO should the notebook port be a parameter?
             ip = self._get_pod_ip(app_id)
