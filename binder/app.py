@@ -93,7 +93,7 @@ class App(object):
             raise App.BuildFailedException("could not fetch repository")
 
     def _get_base_image_name(self):
-        return REGISTRY_NAME + "/" + "binder-base:latest"
+        return REGISTRY_NAME + "/" + "binder-base"
 
     def _get_image_name(self):
         return REGISTRY_NAME + "/" + self.name
