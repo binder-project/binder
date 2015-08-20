@@ -3,11 +3,17 @@
   "image": "{{component.image-name}}:latest",
   "ports": [
     {
+      "hostPort": {{service.worker-port}},
       "containerPort": {{service.worker-port}}
     },
     {
       "containerPort": 8080
     }
   ],
+  "resources": {
+    "limits": {
+      "cpu": "100m"
+    }
+  },
   "command": ["./start.sh", "spark://master:{{service.master-port}}"]
 }

@@ -31,7 +31,12 @@ def build_app(spec, preload=False):
         print("App {} already building. Wait for build to complete before resubmitting.".format(name))
         return
     new_app = App.create(spec)
-    new_app.build(preload=preload)
+    try:
+        new_app.build(preload=preload)
+    except Exception as e:
+        # the "catch-all" clause
+        print("Could not build app {}: {}".format(new_app.name, e))
+        App.index.update_build_state(App.BuildState.FAILED)
 
 class Builder(Thread):
 

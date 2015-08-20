@@ -124,6 +124,19 @@ class App(object):
 
                 for line in final_lines:
                     final_df.write(line)
+                final_df.write("\n")
+            
+                # the dockerfile is building with the repository as its context
+                notebook_path = self._json["notebooks"] if "notebooks" in self._json else "."
+                final_df.write("ADD {0} $HOME/notebooks\n".format(notebook_path))
+                final_df.write("\n")
+
+                # write suffix lines to the app image
+                nb_img_path = os.path.join(build_path, "suffix")
+                with open(os.path.join(nb_img_path, "Dockerfile"), 'r') as nb_img:
+                    for line in nb_img.readlines():
+                        final_df.write(line)
+                    final_df.write("\n")
 
         shutil.move(final_df_path, repo_df_path)
 

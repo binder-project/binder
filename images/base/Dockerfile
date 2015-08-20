@@ -26,6 +26,10 @@ ENV SHELL /bin/bash
 ENV USER main
 WORKDIR $HOME
 
+# Add helper script
+ADD start-notebook.sh /home/main/
+ADD templates/ /srv/templates/
+
 USER root
 
 RUN pip install --upgrade setuptools pip
@@ -35,12 +39,6 @@ RUN wget https://3230d63b5fc54e62148e-c95ac804525aac4b6dba79b00b39d1d3.ssl.cf1.r
 RUN bash Anaconda-2.3.0-Linux-x86_64.sh -b &&\
     rm Anaconda-2.3.0-Linux-x86_64.sh
 ENV PATH $HOME/anaconda/bin:$PATH
-
-# ADD profile_default /home/main/.ipython/profile_default
-ADD templates/ /srv/templates/
-
-# Add helper script
-ADD start-notebook.sh /home/main/
 
 RUN chmod a+rX /srv/templates
 RUN chown -R main:main /home/main

@@ -8,12 +8,11 @@
     }
   },
   "spec": {
-    "type": "NodePort",
+    "type": "LoadBalancer",
     "ports": [
       {
         "port": 80,
-        "targetPort": 8081,
-        "nodePort": 30292
+        "targetPort": 8081
       }
     ],
     "selector": {
