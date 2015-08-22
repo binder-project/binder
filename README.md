@@ -6,7 +6,7 @@ A system for deploying a collection of Jupyter notebooks and their dependencies 
 
 See discussion on the [Jupyter mailing list](https://groups.google.com/forum/#!topic/jupyter/2DjI5sZa8tI).
 
-**WIP** and under very active development. Live demo at (coming soon!). Definitely reach out if you'd like to get involved, and look at the current issues for contribution ideas.
+Live demo at http://mybinder.org. Still under very active development! Definitely reach out if you'd like to get involved, take a look at the current issues for contribution ideas.
 
 ### Goals
 - Provide "one-click" deployment straight from a GitHub repo to interactive Jupyter notebooks
