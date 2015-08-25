@@ -6,7 +6,7 @@ A system for deploying a collection of Jupyter notebooks and their dependencies 
 
 See discussion on the [Jupyter mailing list](https://groups.google.com/forum/#!topic/jupyter/2DjI5sZa8tI).
 
-**WIP** and under very active development. We will add full deployment instructions (and a test demo) soon. Definitely reach out if you'd like to get involved!
+Live demo at http://mybinder.org. Still under very active development! Definitely reach out if you'd like to get involved, take a look at the current issues for contribution ideas.
 
 ### Goals
 - Provide "one-click" deployment straight from a GitHub repo to interactive Jupyter notebooks
@@ -16,11 +16,11 @@ See discussion on the [Jupyter mailing list](https://groups.google.com/forum/#!t
 
 ### Overview
 
-A typical deployment would work like this. 
+A typical deployment works like this. 
 
-A user would provide a GitHub repo and a selected set on services on a website. Given that info, we build and upload docker images for core notebook dependencies and all required services (if not already built). This can take a few minutes, but only needs to happen once per repo. It will need to be repeated if the repo is updated, but we've designed our images to be modular and hopefully make this process faster.
+A user provides a GitHub repo, services, and dependencies at http://mybinder.org. Given that info, we build and upload docker images for core notebook dependencies and all required services (if not already built). This can take a few minutes, but only needs to happen once per repo. It will need to be repeated if the repo is updated, but the modularity of our images will make this process faster.
 
-The above step results in a link that, when clicked, will populate template files for both services and notebooks, and launch the images associated with the binder on a cluster using Kubernetes
+The above step results in a link to an endpoint (of the form `http://mybinder.org/repo/user/project`) that will populate template files for both services and notebooks, and launch the images associated with the binder on a cluster using Kubernetes
 
 ### Concepts
 - `services` : Modular, versioned components that can be configured and added to an app, e.g. databases, Spark, etc. Services are allowed to have client-specific code that can be inserted into the notebook image at build time
