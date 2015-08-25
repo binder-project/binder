@@ -9,6 +9,7 @@ from tornado.httpserver import HTTPServer
 
 from binder.service import Service
 from binder.app import App
+from binder.cluster import ClusterManager
 
 from .builder import Builder
 
@@ -55,7 +56,7 @@ class GithubHandler(BuildHandler):
         return "repo" in spec
 
     def _make_app_name(self, organization, repo):
-        return organization + "-" + repo
+        return (organization + "-" + repo).lower()
 
 
 class GithubStatusHandler(GithubHandler):
@@ -97,7 +98,7 @@ class GithubBuildHandler(GithubHandler):
             self.write({"error": "malformed app specification"})
         else:
             try:
-                spec["name"] = self._make_app_name(organization, repo)
+                spec["name"] = self._make_app_name(organization, repo).lower()
                 spec["repo"] = "https://www.github.com/{0}/{1}".format(organization, repo)
                 build_queue.put(spec)
                 self.write({"success": "app submitted to build queue"})
@@ -126,6 +127,15 @@ class AppsHandler(BinderHandler):
         apps = App.get_app()
         self.write({"apps": [app.name for app in apps]})
 
+class CapacityHandler(BinderHandler):
+    
+    def get(self):
+        super(CapacityHandler, self).get()
+        cm = ClusterManager.get_instance()
+        running = cm.get_running_apps()
+        capacity = cm.get_total_capacity()
+        self.write({"capacity": capacity, "running": running})
+
 def sig_handler(sig, frame):
     IOLoop.instance().add_callback(shutdown)
 
@@ -141,7 +151,8 @@ def main():
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubBuildHandler),
         (r"/apps/(?P<app_id>.+)", OtherSourceHandler),
         (r"/services", ServicesHandler),
-        (r"/apps", AppsHandler)
+        (r"/apps", AppsHandler),
+        (r"/capacity", CapacityHandler)
     ], debug=True)
 
     signal.signal(signal.SIGTERM, sig_handler)

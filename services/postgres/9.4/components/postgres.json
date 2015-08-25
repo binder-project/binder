@@ -6,5 +6,10 @@
       "name": "port",
       "containerPort": {{service.port}}
     }
-  ]
+  ],
+  "resources": {
+     "limits": {
+        "memory": "64Mi"
+    }
+  }
 }

@@ -125,6 +125,9 @@ class App(object):
                 for line in final_lines:
                     final_df.write(line)
                 final_df.write("\n")
+
+                final_df.write("USER main\n")
+                final_df.write("\n")
             
                 # the dockerfile is building with the repository as its context
                 notebook_path = self._json["notebooks"] if "notebooks" in self._json else "."
@@ -142,7 +145,7 @@ class App(object):
 
         # build the app image
         try:
-            image_name = self._get_image_name()
+            image_name = self._get_image_name().lower()
             subprocess.check_call(['docker', 'build', '-t', image_name, os.path.join(app_img_path, "repo")])
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
@@ -184,7 +187,7 @@ class App(object):
 
         # build the app image
         try:
-            image_name = self._get_image_name()
+            image_name = self._get_image_name().lower()
             subprocess.check_call(['docker', 'build', '-t', image_name, app_img_path])
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))

@@ -7,9 +7,11 @@ from multiprocess import pool, Process
 import multiprocessing
 
 from binder.app import App
+from binder.utils import make_dir
 
 NUM_WORKERS = 16
 GET_TIMEOUT = 2
+LOG_DIR = "/home/andrew/logs/binder"
 
 # Copied+pasted from http://stackoverflow.com/questions/6974695/python-process-pool-non-daemonic
 # TODO use message queuing system instead of 2 process pools
@@ -24,9 +26,12 @@ class NoDaemonProcess(Process):
 class NoDaemonPool(pool.Pool):
     Process = NoDaemonProcess
 
-def build_app(spec, preload=False):
+def build_app(spec, log_dir, preload=False):
     name = spec["name"]
+    sys.stdout = open(os.path.join(log_dir, name + "-" + str(os.getpid()) + ".out"), "w", buffering=0)
+    sys.stderr = open(os.path.join(log_dir, name + "-" + str(os.getpid()) + ".err"), "w", buffering=0)
     app = App.get_app(name)
+    print("In build_app")
     if app and app.build_state == App.BuildState.BUILDING:
         print("App {} already building. Wait for build to complete before resubmitting.".format(name))
         return
@@ -50,6 +55,8 @@ class Builder(Thread):
         self._stopped = False
         self._preload = preload
 
+        make_dir(LOG_DIR)
+
     def stop(self):
         self._stopped = True
         self._pool.terminate()
@@ -57,7 +64,7 @@ class Builder(Thread):
     def _build(self, spec):
         try:
             pool = self._pool
-            pool.apply_async(build_app, (spec, self._preload))
+            pool.apply_async(build_app, (spec, LOG_DIR, self._preload))
         except Exception as e:
             print("Exception in _build: {}".format(e))
 

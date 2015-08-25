@@ -3,7 +3,6 @@
   "image": "{{component.image-name}}:latest",
   "ports": [
     {
-      "hostPort": {{service.worker-port}},
       "containerPort": {{service.worker-port}}
     },
     {

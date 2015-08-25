@@ -19,6 +19,11 @@
       ],
       "command": ["/home/main/start-notebook.sh", "--ip='*'", "--port={{app.notebooks-port}}",
                 "--NotebookApp.base_url='/{{app.id}}'", "--debug"]
-    }]
+    }],
+    "resources": {
+        "limits": {
+            "memory": "128Mi"
+        }
+    }
   }
 }

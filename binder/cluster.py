@@ -38,6 +38,12 @@ class ClusterManager(object):
     def destroy(self):
         pass
 
+    def list_running_apps(self):
+        pass
+
+    def get_total_capacity(self):
+        pass
+
     def deploy_app(self, app_id, app_dir):
         """
         Deploys an app on the cluster. Returns the IP/port combination for the notebook server
@@ -228,8 +234,16 @@ class KubernetesManager(ClusterManager):
 
         return False
 
-    def preload_image(self, image_name):
+    def get_running_apps(self):
+        try:
+            output = subprocess.check_output(['kubectl.sh', 'get', 'namespaces'])
+            # don't count header row and the kube-system and default namespaces
+            return len(output.split('\n')) - 3
+        except subprocess.CalledProcessError as e:
+            print("Couldn't get number of running apps: {}".format(e))
+        return None
 
+    def _nodes_command(self, func):
         provider = os.environ["KUBERNETES_PROVIDER"]
 
         if provider == 'gce':
@@ -250,34 +264,52 @@ class KubernetesManager(ClusterManager):
             nodes_cmd = ["kubectl.sh", "get", "nodes"]
             output = subprocess.check_output(nodes_cmd)
             nodes = output.split("\n")[1:]
-           
-            def preload(node):
-                split = node.split()
-                if len(split) > 0:
-                    node_name = split[0]
-                    if node_name != "kubernetes-master":
-                        print("Preloading {0} onto {1}...".format(image_name, node_name))
-                        docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
-                        cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
-                               "--command", "{}".format(docker_cmd)]
-                        return subprocess.Popen(cmd)
-                return None
             
-            procs = [preload(node) for node in nodes]
-            print("Waiting for preloading to finish...")
-            for proc in procs:
-                if proc:
-                    proc.wait()
-            print("Preloaded image {} onto all nodes".format(image_name))
-            return True
-
+            return [func(node, zone) for node in nodes]          
+            
         elif provider == 'aws':
             # TODO support aws
-            pass
+            return []
 
         else:
             print("Only aws and gce providers are currently supported")
-            return False
+            return []
+
+    def get_total_capacity(self):
+        def _get_capacity(node, zone):
+            pod_re = re.compile(".*pods:\s+(?P<pods>\d+)")
+            split = node.split()
+            if len(split) > 0:
+                node_name = split[0]
+                cmd = ['kubectl.sh', 'describe', 'node', node_name]
+                output_lines = subprocess.check_output(cmd).split('\n')
+                match_lines = [pod_re.search(l) for l in output_lines if pod_re.search(l)]
+                if match_lines:
+                    return int(match_lines[0].group('pods'))
+                return 0
+            return 0
+        caps = self._nodes_command(_get_capacity)
+        return sum(caps)
+           
+    def preload_image(self, image_name):
+        def _preload(node, zone):
+            split = node.split()
+            if len(split) > 0:
+                node_name = split[0]
+                if node_name != "kubernetes-master":
+                    print("Preloading {0} onto {1}...".format(image_name, node_name))
+                    docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
+                    cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
+                           "--command", "{}".format(docker_cmd)]
+                    return subprocess.Popen(cmd)
+            return None
+        procs = self._nodes_command(_preload)
+        print("Waiting for preloading to finish...")
+        for proc in procs:
+            if proc:
+                proc.wait()
+        print("Preloaded image {} onto all nodes".format(image_name))
+        return True
 
     def _start_proxy_server(self):
         token = self._generate_auth_token()

@@ -1,4 +1,3 @@
 #!/bin/bash
 echo "KUBERNETES_PROVIDER: " $KUBERNETES_PROVIDER
-/home/andrew/binder/bin/binder list apps
 /home/andrew/binder/bin/binder stop app --inactive-since 60
