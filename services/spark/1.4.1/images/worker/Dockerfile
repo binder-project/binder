@@ -18,6 +18,5 @@ ENV SPARK_HOME $HOME/spark-1.4.1-bin-hadoop1
 ENV PATH $PATH:$SPARK_HOME/bin
 ENV PATH $PATH:$SPARK_HOME/sbin
 ENV PYTHONPATH $SPARK_HOME/python/lib/py4j-0.8.2.1-src.zip:$PYTHONPATH
-ENV _JAVA_OPTIONS "-Xms512m -Xmx2g"
 
 ADD start.sh $HOME/

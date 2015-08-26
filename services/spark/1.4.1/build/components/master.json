@@ -23,7 +23,8 @@
   ],
   "resources": {
     "limits": {
-      "cpu": "100m"
+      "cpu": "100m",
+      "memory": "64Mi"
     }
   },
   "command": ["./start.sh"]

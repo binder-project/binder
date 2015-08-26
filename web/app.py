@@ -1,6 +1,7 @@
 import Queue
 import json
 import signal
+import time
 
 from tornado import gen
 from tornado.ioloop import IOLoop
@@ -128,13 +129,22 @@ class AppsHandler(BinderHandler):
         self.write({"apps": [app.name for app in apps]})
 
 class CapacityHandler(BinderHandler):
+
+    POLL_PERIOD = 3600
+
+    cached_capacity = None
+    last_poll = None
     
     def get(self):
         super(CapacityHandler, self).get()
         cm = ClusterManager.get_instance()
         running = cm.get_running_apps()
-        capacity = cm.get_total_capacity()
-        self.write({"capacity": capacity, "running": running})
+        if not self.last_poll or not self.cached_capacity or\
+                time.time() - self.last_poll > CapacityHandler.POLL_PERIOD:
+            capacity = cm.get_total_capacity()
+            CapacityHandler.cached_capacity = capacity
+            CapacityHandler.last_poll = time.time()
+        self.write({"capacity": self.cached_capacity, "running": running})
 
 def sig_handler(sig, frame):
     IOLoop.instance().add_callback(shutdown)

@@ -18,7 +18,7 @@ from binder.utils import fill_template_string, get_env_string
 
 class ClusterManager(object):
 
-    CLUSTER_HOST = "http://app.mybinder.org"
+    CLUSTER_HOST = "app.mybinder.org"
 
     # the singleton manager
     manager = None
@@ -106,18 +106,33 @@ class KubernetesManager(ClusterManager):
         return self.__get_service_url("registry")
 
     def _get_lookup_url(self):
-        return self.__get_service_url("proxy-lookup")
+        #return self.__get_service_url("proxy-lookup")
+        return ClusterManager.CLUSTER_HOST
 
     def _get_pod_ip(self, app_id):
         try:
             cmd = ["kubectl.sh", "describe", "pod", "notebook-server", "--namespace={}".format(app_id)]
             output = subprocess.check_output(cmd)
             ip_re = re.compile("IP:(?P<ip>.*)\n")
+            ready_re = re.compile("State:\s+(?P<ready>.*)")
             m = ip_re.search(output)
             if not m:
                 print("Could not extract IP from pod description")
                 return None
             return m.group("ip").strip()
+
+            # TODO the following code makes the above check safer (will prevent proxy errors) but is too slow
+            ready = ready_re.search(output)
+            if not ready:
+                print("Extracted the pod IP, but the notebook container is not ready")
+                return None 
+            else:
+                status = ready.group("ready").lower().strip()
+                print "status: {}".format(status)
+                if status != "running":
+                    print("Extracted the pod IP, but the notebook container is not ready")
+                    return None
+
         except subprocess.CalledProcessError as e:
             return None
 
@@ -214,6 +229,8 @@ class KubernetesManager(ClusterManager):
         for i in range(num_retries):
             # TODO should the notebook port be a parameter?
             ip = self._get_pod_ip(app_id)
+            # TODO this is a stopgap solution for a race condition that should be fixed through other means
+            time.sleep(1)
             if ip:
                 base_url, token = self._read_proxy_info()
                 body = {'target': "http://" + ip + ":8888"}
