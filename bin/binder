@@ -170,10 +170,13 @@ def _stop_subparser(parser):
 
 def handle_stop(args):
     if args.subcmd == "app":
+        cm = ClusterManager.get_instance()
         if args.id:
-            ClusterManager.get_instance().stop_app(args.id)
+            cm.stop_app(args.id)
         elif args.inactive:
-            ClusterManager.get_instance().stop_inactive_apps(args.inactive)
+            cm.stop_inactive_apps(args.inactive)
+        else:
+            cm.stop_all_apps()
 
 choices = {
     "list": {

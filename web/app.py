@@ -138,7 +138,8 @@ class CapacityHandler(BinderHandler):
     def get(self):
         super(CapacityHandler, self).get()
         cm = ClusterManager.get_instance()
-        running = cm.get_running_apps()
+        # don't count the default and kube-system namespaces
+        running = len(cm.get_running_apps()) - 3
         if not self.last_poll or not self.cached_capacity or\
                 time.time() - self.last_poll > CapacityHandler.POLL_PERIOD:
             capacity = cm.get_total_capacity()

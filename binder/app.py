@@ -36,6 +36,14 @@ class App(object):
         return None
 
     @staticmethod
+    def preload_all_apps():
+        apps = App.get_app()
+        cm = ClusterManager.get_instance()
+        cm.preload_image("binder-base")
+        for app in apps:
+            cm.preload_image(app.name)
+
+    @staticmethod
     def create(spec):
         return App(App.index.create(spec))
 

@@ -254,10 +254,9 @@ class KubernetesManager(ClusterManager):
     def get_running_apps(self):
         try:
             output = subprocess.check_output(['kubectl.sh', 'get', 'namespaces'])
-            # don't count header row and the kube-system and default namespaces
-            return len(output.split('\n')) - 3
+            return map(lambda line: line.split()[0], output.split('\n')[1:-1]) 
         except subprocess.CalledProcessError as e:
-            print("Couldn't get number of running apps: {}".format(e))
+            print("Couldn't get running apps: {}".format(e))
         return None
 
     def _nodes_command(self, func):
@@ -460,6 +459,8 @@ class KubernetesManager(ClusterManager):
         return app_url
 
     def stop_app(self, app_id):
+        if app_id == "kube-system":
+            return 
         try:
             stop_cmd = ["kubectl.sh", "stop", "pods,services,replicationControllers", "--all",
                    "--namespace={}".format(app_id)]
@@ -471,14 +472,18 @@ class KubernetesManager(ClusterManager):
         except subprocess.CalledProcessError as e:
             print("Could not stop app {}".format(app_id))
 
-    def stop_inactive_apps(self, min_inactive):
-        routes = self._get_inactive_routes(min_inactive)
-        if not routes:
-            print("No inactive apps to stop")
+    def _stop_apps(self, app_ids):
+        if not app_ids:
+            print("No apps to stop")
             return
-        for app_id in routes:
-            print("Stopping inactive app {}".format(app_id))
+        for app_id in app_ids:
             self.stop_app(app_id)
 
+    def stop_inactive_apps(self, min_inactive):
+        routes = self._get_inactive_routes(min_inactive)
+        self._stop_apps(routes)
 
+    def stop_all_apps(self):
+        app_ids = self.get_running_apps()
+        self._stop_apps(app_ids)
 
