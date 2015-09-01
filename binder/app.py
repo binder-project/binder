@@ -173,6 +173,7 @@ class App(object):
                 if dependency == "requirements.txt":
                     app.write("ADD {0} requirements.txt\n".format("repo/requirements.txt"))
                     app.write("RUN pip install -r requirements.txt\n")
+                    app.write("RUN /home/main/anaconda/envs/python3/bin/pip install -r requirements.txt\n")
                     app.write("\n")
 
             # if any services have client code, insert that now
