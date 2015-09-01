@@ -31,8 +31,12 @@ ADD start-notebook.sh /home/main/
 ADD templates/ /srv/templates/
 
 USER root
+RUN chmod a+rX /srv/templates
+RUN chown -R main:main /home/main
 
 RUN pip install --upgrade setuptools pip
+
+USER main
 
 # Install Anaconda and Jupyter
 RUN wget https://3230d63b5fc54e62148e-c95ac804525aac4b6dba79b00b39d1d3.ssl.cf1.rackcdn.com/Anaconda-2.3.0-Linux-x86_64.sh
@@ -40,16 +44,10 @@ RUN bash Anaconda-2.3.0-Linux-x86_64.sh -b &&\
     rm Anaconda-2.3.0-Linux-x86_64.sh
 ENV PATH $HOME/anaconda/bin:$PATH
 RUN conda create -n python3 python=3.3 anaconda
-ENV SHELL /bin/bash
-RUN /bin/bash -c "source activate python3 && ipython kernelspec install-self && source deactivate"
-
-RUN chmod a+rX /srv/templates
-RUN chown -R main:main /home/main
+RUN /bin/bash -c "source activate python3 && ipython kernelspec install-self --user"
 
 # Convert notebooks to the current format
 # RUN find . -name '*.ipynb' -exec ipython nbconvert --to notebook {} --output {} \;
 # RUN find . -name '*.ipynb' -exec ipython trust {} \;
-
-USER main
 
 ENV SHELL /bin/bash
