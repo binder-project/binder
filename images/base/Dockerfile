@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt-get update -y &&\
     apt-get install -y curl git vim wget build-essential python-dev ca-certificates bzip2 libsm6\
-      nodejs-legacy npm python-virtualenv python-pip gcc gfortran &&\
+      nodejs-legacy npm python-virtualenv python-pip gcc gfortran libglib2.0-0 python-qt4 &&\
     apt-get clean &&\
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*tmp
 
