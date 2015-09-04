@@ -168,12 +168,22 @@ class App(object):
             app.write("FROM {}\n".format(self._get_base_image_name()))
             app.write("\n")
 
+            if 'requirements.txt' and 'environment.yml' in self.dependencies:
+                raise App.BuildFailedException("cannot have both a requirements.txt and environment.yml")
             for dependency in self.dependencies:
                 # TODO do more modular dependency handling here
                 if dependency == "requirements.txt":
                     app.write("ADD {0} requirements.txt\n".format("repo/requirements.txt"))
                     app.write("RUN pip install -r requirements.txt\n")
                     app.write("RUN /home/main/anaconda/envs/python3/bin/pip install -r requirements.txt\n")
+                    app.write("\n")
+                elif dependency == "environment.yml":
+                    app.write("ADD {0} environment.yml\n".format("repo/environment.yml"))
+                    # see https://github.com/conda/conda-env/issues/166
+                    # we override whatever name has been specified for the environment
+                    app.write("RUN /home/main/anaconda/bin/conda env create -n binder\n")
+                    # so that we can explicitly activate it here
+                    app.write("RUN /home/main/anaconda/bin/source activate binder\n")
                     app.write("\n")
 
             # if any services have client code, insert that now
