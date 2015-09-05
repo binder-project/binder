@@ -171,9 +171,10 @@ class App(object):
             for dependency in self.dependencies:
                 # TODO do more modular dependency handling here
                 if dependency == "requirements.txt":
-                    app.write("ADD {0} requirements.txt\n".format("repo/requirements.txt"))
-                    app.write("RUN pip install -r requirements.txt\n")
-                    app.write("RUN /home/main/anaconda/envs/python3/bin/pip install -r requirements.txt\n")
+                    shutil.copy(os.path.join(ROOT, "util", "handle-requirements.py"), os.path.join(app_img_path, "handle-requirements.py"))
+                    app.write("ADD {} requirements.txt\n".format("repo/requirements.txt"))
+                    app.write("ADD handle-requirements.py handle-requirements.py\n")
+                    app.write("RUN python handle-requirements.py\n")
                     app.write("\n")
                 elif dependency == "environment.yml":
                     app.write("ADD {0} environment.yml\n".format("repo/environment.yml"))
