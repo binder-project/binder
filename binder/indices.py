@@ -11,6 +11,8 @@ class AppIndex(object):
     Responsible for finding and managing metadata about apps.
     """
 
+    TAG = "AppIndex"
+
     _singleton = None
 
     @staticmethod
@@ -43,6 +45,7 @@ class FileAppIndex(AppIndex):
     Finds/manages apps by searching for a certain directory structure in a directory hierarchy
     """
 
+    TAG = "FileAppIndex"
     APPS_DIR = "apps"
 
     def __init__(self, root):
@@ -67,7 +70,7 @@ class FileAppIndex(AppIndex):
                     m = self._build_meta(spec, app_path)
                     apps[spec["name"]] = m
             except IOError as e:
-                print("Could not build app: {0}".format(path))
+                error_log(self.TAG,"Could not build app: {0}".format(path))
         return apps
 
     def create(self, spec):
@@ -101,13 +104,15 @@ class FileAppIndex(AppIndex):
             return state_json["build_state"]
 
     def save_app(self, app):
-        print("app currently must be rebuilt before each launch")
+        info_log(self.TAG, "app currently must be rebuilt before each launch")
 
 
 class ServiceIndex(object):
     """
     Responsible for finding and managing metadata about services
     """
+    
+    TAG = "ServiceIndex"
 
     _singleton = None
 
@@ -129,6 +134,7 @@ class FileServiceIndex(ServiceIndex):
     Finds/manages services by searching for a certain directory structure in a directory hierarchy
     """
 
+    TAG = "FileServiceIndex"
     SERVICES_DIR = "services"
 
     def __init__(self, root):
@@ -155,7 +161,7 @@ class FileServiceIndex(ServiceIndex):
                                 s["last_build"] = json.load(lbf)
                         services[name + '-' + version] = s
                 except IOError:
-                    print("Could not build service: {0}".format(name + "-" + version))
+                    error_log(self.TAG, "Could not build service: {0}".format(name + "-" + version))
         return services
 
     def save_service(self, service):

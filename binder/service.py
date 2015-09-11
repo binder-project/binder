@@ -8,9 +8,12 @@ from memoized_property import memoized_property
 from binder.settings import MainSettings
 from binder.utils import fill_template_string, fill_template, namespace_params, make_dir
 from binder.indices import ServiceIndex
+from binder.log import *
 
 
 class Service(object):
+
+    TAG = "Service"
 
     index = ServiceIndex.get_index(MainSettings.ROOT)
 
@@ -93,20 +96,20 @@ class Service(object):
                         image_name = MainSettings.REGISTRY_NAME + "/" + self.full_name + "-" + image["name"]
                         image_path = os.path.join(build_path, "images", image["name"])
                         subprocess.check_call(['docker', 'build', '-t', image_name, image_path])
-                        print("Squashing and pushing {} to private registry...".format(image_name))
+                        info_log(self.TAG, "Squashing and pushing {} to private registry...".format(image_name))
                         subprocess.check_call([os.path.join(MainSettings.ROOT, "util", "squash-and-push"), image_name])
                     except subprocess.CalledProcessError as e:
                         raise Service.BuildFailedException("could not build service {0}: {1}".format(self.full_name, e))
             except Service.BuildFailedException as e:
-                print("could not build service: {0}: {1}".format(self.full_name, e))
+                error_log(self.TAG, "could not build service: {0}: {1}".format(self.full_name, e))
                 return False
 
-            print("Successfully built {0}".format(self.full_name))
+            info_log(self.TAG, "Successfully built {0}".format(self.full_name))
             # write latest build parameters
             self.index.save_service(self)
             return True
         else:
-            print("Image {0} not changed since last build. Not rebuilding.".format(self.full_name))
+            info_log(self.TAG, "Image {0} not changed since last build. Not rebuilding.".format(self.full_name))
             return True
 
     def deploy(self, mode, deploy_path, app, templates):
@@ -139,7 +142,7 @@ class Service(object):
                 dep_params["image-name"] = MainSettings.REGISTRY_NAME + "/" + self.full_name + "-" + comp_name
 
                 final_params = dict(service_params.items() + namespace_params("component", dep_params).items())
-                print("final_params: {0}".format(final_params))
+                debug_log(self.TAG, "final_params: {0}".format(final_params))
 
                 filled_comp = fill_template_string(comps[comp_name + ".json"], final_params)
 

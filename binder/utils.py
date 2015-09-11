@@ -3,6 +3,7 @@ import os
 import re
 
 from settings import MainSettings
+from binder.log import *
 
 def namespace_params(ns, params):
     ns_params = {}
@@ -31,7 +32,7 @@ def fill_template(template_path, params):
                 replaced = pattern.sub(new, replaced)
             template.write(replaced)
     except (IOError, TypeError) as e:
-        print("Could not fill template {0}: {1}".format(template_path, e))
+        error_log("fill_template", "Could not fill template {0}: {1}".format(template_path, e))
 
 def make_dir(path, clean=False):
     if os.path.isdir(path):
