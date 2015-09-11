@@ -1,55 +1,66 @@
-import logging
-import sys
-from threading import Lock
+from Queue import Queue
 
-from binder.settings import LOG_FILE, LOG_LEVEL
+from binder.binderd.client import BinderClient
 
-class Logger(object):
+class LoggerClient(Thread):
 
     _singleton = None
-    log_lock = Lock()
 
     @staticmethod
     def getInstance():
-        if not Logger._singleton:
-            logging.basicConfig(filename=LOG_FILE, level=LOG_LEVEL)
-            Logger._singleton = logging.getLogger(__name__)
-            Logger.configure(Logger._singleton)
-        return Logger._singleton
+        if not LoggerClient._singleton:
+            LoggerClient._singleton = LoggerClient()
+        return LoggerClient._singleton
 
-    @staticmethod
-    def configure(logger):
-        """
-        Set the log message format, threshold, etc here...
-        """
-        pass
+    def __init__(self):
+        super(Thread, self).__init__()
+        self._stopped = False
 
-def lock_method(log_func):
-    def log(msg):
-        Logger.log_lock.acquire()
-        try:
-            log_func(msg)
-        except Exception:
-            pass
-        Logger.log_lock.release()
-    return log
+        self._queue = Queue()
+        self._client = BinderClient("log_writer")
 
-@lock_method
-def debugLog(msg):
-    log = Logger.getInstance()
-    log.debug(msg)
+    def stop(self): 
+        self._client.close()
+        self._stopped= True
 
-@lock_method
-def infoLog(msg):
-    log = Logger.getInstance()
-    log.info(msg)
+    def run(self):
+        while not self._stopped:
+            try:
+                if not self._queue.empty():
+                    msg = self._queue.get()
+                    self._client.send(msg)
+            except Queue.Empty:
+                # if the queue is empty, continue to the next iteration
+                pass
 
-@lock_method
-def warningLog(msg):
-    log = Logger.getInstance()
-    log.warning(msg)
+    def _send(self, msg):
+        self._queue.put(msg)
 
-@lock_method
-def errorLog(msg):
-    log = Logger.getInstance()
-    log.error(msg)
+    def debug(self, tag, msg, app=None):
+        self._send({'type': 'log', 'level': logging.DEBUG, 'msg': msg, 'tag': tag, 'app': app})
+
+    def info(self, tag, msg, app=None):
+        self._send({'type': 'log', 'level': logging.INFO, 'msg': msg, 'tag': tag, 'app': app})
+
+    def warn(self, tag, msg, app=None):
+        self._send({'type': 'log', 'level': logging.WARNING, 'msg': msg, 'tag': tag, 'app': app})
+
+    def error(self, tag, msg, app=None):
+        self._send({'type': 'log', 'level': logging.ERROR, 'msg': msg, 'tag': tag, 'app': app})
+
+def debugLog(tag, msg):
+    log = LoggerClient.getInstance()
+    log.debug(tag, msg)
+
+def infoLog(tag, msg):
+    log = LoggerClient.getInstance()
+    log.info(tag, msg)
+
+def warningLog(tag, msg):
+    log = LoggerClient.getInstance()
+    log.warning(tag, msg)
+
+def errorLog(tag, msg):
+    log = LoggerClient.getInstance()
+    log.error(tag, msg)
+
