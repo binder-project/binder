@@ -18,18 +18,24 @@ class BinderDModule(Process):
             super(BinderDModule.Worker, self).__init__(context, url, tag)
             self.module = module
 
+        def _process_return(self, msg):
+            return bytes(json.dumps(msg))
+
         def on_request(self, msg):
             """
             MDPWorker interface
             """
-            msg = json.loads(msg)
+            msg = json.loads(str(msg[0]))
             if not 'type' in msg:
-                return
+                self.reply(self._process_return(self.module._error_msg("no type tag")))
             elif 'type' == 'stop':
                 self.module._handle_stop()
                 self.module.stop()
+                rsp = self.module._success_msg("stopped module {}".format(self.module.TAG))
+                self.reply(self._process_return(rsp))
             else:
-                self.module._handle_message(msg)
+                rsp = self.module._handle_message(msg)
+                self.reply(self._process_return(rsp))
 
     def __init__(self):
         super(BinderDModule, self).__init__()
@@ -44,6 +50,12 @@ class BinderDModule(Process):
         IOLoop.instance().start()
         worker.shutdown()
 
+    def _error_msg(self, error):
+        return {"type": "error", "msg": "{}".format(error)}
+
+    def _success_msg(self, msg):
+        return {"type": "success", "msg": "{}".format(msg)}
+
     def _initialize(self):
         """
         Abstract method
@@ -54,13 +66,13 @@ class BinderDModule(Process):
         """
         Abstract method
         """
-        pass
+        return self._success_msg("default response")
 
     def _handle_stop(self):
         """
         Abstract method
         """
-        pass
+        return self._success_msg("default response")
 
     def _get_message(self):
         pass

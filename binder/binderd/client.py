@@ -3,7 +3,7 @@ import json
 import zmq 
 from mdp.client import MDPClient, mdp_request
 
-from binder.settings import LogSettings
+from binder.settings import LogSettings, BinderDSettings
 from binder.binderd import modules
 
 class BinderClient(object):
@@ -45,8 +45,9 @@ class BinderClient(object):
             pass
         else:
             # using MDP module to send to service
-            res = mdp_request(self._sock, bytes(self.name), bytes(msg), 2.0)
-            return json.loads(res)
+            res = mdp_request(self._sock, bytes(self.name), [bytes(msg),], 2.0)
+            # the first element in the list is the service name
+            return json.loads(res[1])
 
     def __enter__(self):
         return self

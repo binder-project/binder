@@ -14,10 +14,12 @@ from multiprocess import Pool
 
 from binder.settings import MainSettings, MonitoringSettings
 from binder.utils import fill_template_string, get_env_string
+from binder.log import error_log
 
 
 class ClusterManager(object):
 
+    TAG = "ClusterManager"
     CLUSTER_HOST = "app.mybinder.org"
 
     # the singleton manager
@@ -58,6 +60,8 @@ class ClusterManager(object):
 
 
 class KubernetesManager(ClusterManager):
+    
+    TAG = "KubernetesManager"
 
     pool = Pool(5)
 
@@ -245,6 +249,7 @@ class KubernetesManager(ClusterManager):
                     else:
                         raise Exception("could not register route with proxy server")
                 except requests.exceptions.ConnectionError:
+                    error_log(self.TAG, "could not connect to proxy server")
                     pass
             print("App not yet assigned an IP address. Waiting for {} seconds...".format(pause))
             time.sleep(pause)

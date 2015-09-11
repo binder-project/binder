@@ -1,4 +1,6 @@
+import logging
 from Queue import Queue
+from threading import Thread
 
 from binder.binderd.client import BinderClient
 
@@ -48,19 +50,19 @@ class LoggerClient(Thread):
     def error(self, tag, msg, app=None):
         self._send({'type': 'log', 'level': logging.ERROR, 'msg': msg, 'tag': tag, 'app': app})
 
-def debugLog(tag, msg):
+def debug_log(tag, msg):
     log = LoggerClient.getInstance()
     log.debug(tag, msg)
 
-def infoLog(tag, msg):
+def info_log(tag, msg):
     log = LoggerClient.getInstance()
     log.info(tag, msg)
 
-def warningLog(tag, msg):
+def warning_log(tag, msg):
     log = LoggerClient.getInstance()
     log.warning(tag, msg)
 
-def errorLog(tag, msg):
+def error_log(tag, msg):
     log = LoggerClient.getInstance()
     log.error(tag, msg)
 

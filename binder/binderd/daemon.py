@@ -1,5 +1,6 @@
 from multiprocessing import Process
 from threading import Thread
+from importlib import import_module
 
 import zmq
 from zmq.eventloop.ioloop import IOLoop
@@ -36,7 +37,9 @@ class BinderDProcess(Process):
 
         # start all submodules
         for module in modules:
-            clazz = modules[module]
+            pymod_name, class_name = modules[module]
+            pymod = import_module(pymod_name)
+            clazz = getattr(pymod, class_name)
             instance = clazz()
             instance.start()
 
