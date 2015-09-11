@@ -12,7 +12,7 @@ from crontab import CronTab
 from memoized_property import memoized_property
 from multiprocess import Pool
 
-from binder.settings import ROOT, REGISTRY_NAME, DOCKER_HUB_USER, APP_CRON_PERIOD
+from binder.settings import MainSettings, MonitoringSettings
 from binder.utils import fill_template_string, get_env_string
 
 
@@ -137,7 +137,7 @@ class KubernetesManager(ClusterManager):
             return None
 
     def _launch_registry_server(self):
-        registry_path = os.path.join(ROOT, "registry")
+        registry_path = os.path.join(MainSettings.ROOT, "registry")
 
         for name in os.listdir(registry_path):
             self._create(os.path.join(registry_path, name))
@@ -148,7 +148,7 @@ class KubernetesManager(ClusterManager):
     def _launch_proxy_server(self, token):
 
         # TODO the following chunk of code is reused in App.deploy (should be abstracted away)
-        proxy_path = os.path.join(ROOT, "proxy")
+        proxy_path = os.path.join(MainSettings.ROOT, "proxy")
 
          # clean up the old deployment
         deploy_path = os.path.join(proxy_path, "deploy")
@@ -175,22 +175,22 @@ class KubernetesManager(ClusterManager):
             self._create(os.path.join(deploy_path, name))
 
     def _read_proxy_info(self):
-        with open(os.path.join(ROOT, ".proxy_info"), "r") as proxy_file:
+        with open(os.path.join(MainSettings.ROOT, ".proxy_info"), "r") as proxy_file:
             raw_host, raw_token = proxy_file.readlines()
             return "http://" + raw_host.strip() + "/api/routes", raw_token.strip()
 
     def _write_proxy_info(self, url, token):
-        with open(os.path.join(ROOT, ".proxy_info"), "w+") as proxy_file:
+        with open(os.path.join(MainSettings.ROOT, ".proxy_info"), "w+") as proxy_file:
             proxy_file.write("{}\n".format(url))
             proxy_file.write("{}\n".format(token))
 
     def _read_registry_url(self):
-        with open(os.path.join(ROOT, ".registry_info"), "r") as registry_file:
+        with open(os.path.join(MainSettings.ROOT, ".registry_info"), "r") as registry_file:
             url = registry_file.readlines()[0]
             return url
 
     def _write_registry_url(self, url):
-        with open(os.path.join(ROOT, ".registry_info"), "w+") as registry_file:
+        with open(os.path.join(MainSettings.ROOT, ".registry_info"), "w+") as registry_file:
             registry_file.write("{}\n".format(url))
 
     def _get_inactive_routes(self, min_inactive):
@@ -314,7 +314,7 @@ class KubernetesManager(ClusterManager):
                 node_name = split[0]
                 if node_name != "kubernetes-master":
                     print("Preloading {0} onto {1}...".format(image_name, node_name))
-                    docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
+                    docker_cmd = "sudo docker pull {0}/{1}".format(MainSettings.REGISTRY_NAME, image_name)
                     cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
                            "--command", "{}".format(docker_cmd)]
                     return subprocess.Popen(cmd)
@@ -363,10 +363,10 @@ class KubernetesManager(ClusterManager):
 
     def _preload_registry_server(self):
         try:
-            subprocess.check_call(["docker", "pull", "{}/binder-base".format(DOCKER_HUB_USER)])
-            subprocess.check_call(["docker", "tag", "{}/binder-base".format(DOCKER_HUB_USER),
-                "{}/binder-base".format(REGISTRY_NAME)])
-            subprocess.check_call(["docker", "push", "{}/binder-base".format(REGISTRY_NAME)])
+            subprocess.check_call(["docker", "pull", "{}/binder-base".format(MainSettings.DOCKER_HUB_USER)])
+            subprocess.check_call(["docker", "tag", "{}/binder-base".format(MainSettings.DOCKER_HUB_USER),
+                "{}/binder-base".format(MainSettings.REGISTRY_NAME)])
+            subprocess.check_call(["docker", "push", "{}/binder-base".format(MainSettings.REGISTRY_NAME)])
             return True
         except subprocess.CalledProcessError as e:
             print("Could not preload registry server with binder-base image: {}".format(e))
@@ -396,10 +396,10 @@ class KubernetesManager(ClusterManager):
 
             # start the inactive app removal cron job
             cron = CronTab()
-            cmd = " ".join([get_env_string(), os.path.join(ROOT, "util", "stop-inactive-apps"),
+            cmd = " ".join([get_env_string(), os.path.join(MainSettings.ROOT, "util", "stop-inactive-apps"),
                             "&>/tmp/binder-cron"])
             job = cron.new(cmd, comment="binder-stop")
-            job.minute.every(APP_CRON_PERIOD)
+            job.minute.every(MonitoringSettings.APP_CRON_PERIOD)
             job.enable(True)
             cron.write_to_user(user=True)
 

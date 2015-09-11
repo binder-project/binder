@@ -12,17 +12,17 @@ import zmq
 from binder.app import App
 from binder.settings import LogSettings
 from binder.utils import make_dir
+from binder.binderd.module import BinderDModule
 
 
-def LogWriter(BinderDModule):
+class LogWriter(BinderDModule):
 
     TAG = "log_writer"
 
     ROOT_FORMAT = "%(asctime)s - %(tag)s: %(message)s"
-    APP_FORMAT = "%(asctime)s - %(app)s:%(tag)s: %(message)s"
     
     def __init__(self):
-        super(BinderDModule, self).__init__()
+        super(LogWriter, self).__init__()
         self._stopped = None
 
         # set once the process has started
@@ -37,7 +37,7 @@ def LogWriter(BinderDModule):
         log_dir = os.path.join(LogSettings.ROOT_DIRECTORY, "root")
         make_dir(log_dir)
 
-        logging.basicConfig(format=LoggingProcess.ROOT_FORMAT)
+        logging.basicConfig(format=LogWriter.ROOT_FORMAT)
         self._root_logger = logging.getLogger(__name__) 
 
         self._set_logging_config(log_dir, LogSettings.ROOT_FILE, self._root_logger)
@@ -72,7 +72,7 @@ def LogWriter(BinderDModule):
         return self._app_loggers.get(app)
 
     def _initialize(self):
-        super(BinderDModule, self).__init__()
+        super(LogWriter, self)._initialize()
         # set up the loggers
         self._app_loggers = {}
         self._root_logger = None

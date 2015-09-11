@@ -5,14 +5,14 @@ import subprocess
 
 from memoized_property import memoized_property
 
-from binder.settings import ROOT, REGISTRY_NAME
+from binder.settings import MainSettings
 from binder.utils import fill_template_string, fill_template, namespace_params, make_dir
 from binder.indices import ServiceIndex
 
 
 class Service(object):
 
-    index = ServiceIndex.get_index(ROOT)
+    index = ServiceIndex.get_index(MainSettings.ROOT)
 
     class BuildFailedException(Exception):
         pass
@@ -90,11 +90,11 @@ class Service(object):
                 # now that all templates are filled, build/upload images
                 for image in self.images:
                     try:
-                        image_name = REGISTRY_NAME + "/" + self.full_name + "-" + image["name"]
+                        image_name = MainSettings.REGISTRY_NAME + "/" + self.full_name + "-" + image["name"]
                         image_path = os.path.join(build_path, "images", image["name"])
                         subprocess.check_call(['docker', 'build', '-t', image_name, image_path])
                         print("Squashing and pushing {} to private registry...".format(image_name))
-                        subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
+                        subprocess.check_call([os.path.join(MainSettings.ROOT, "util", "squash-and-push"), image_name])
                     except subprocess.CalledProcessError as e:
                         raise Service.BuildFailedException("could not build service {0}: {1}".format(self.full_name, e))
             except Service.BuildFailedException as e:
@@ -136,7 +136,7 @@ class Service(object):
 
                 # TODO: perhaps this should be done in a cleaner way?
                 dep_params["name"] = comp_name
-                dep_params["image-name"] = REGISTRY_NAME + "/" + self.full_name + "-" + comp_name
+                dep_params["image-name"] = MainSettings.REGISTRY_NAME + "/" + self.full_name + "-" + comp_name
 
                 final_params = dict(service_params.items() + namespace_params("component", dep_params).items())
                 print("final_params: {0}".format(final_params))

@@ -6,7 +6,7 @@ import time
 from memoized_property import memoized_property
 import requests
 
-from binder.settings import ROOT, REGISTRY_NAME
+from binder.settings import MainSettings
 from binder.utils import namespace_params, fill_template, fill_template_string, make_dir
 from binder.cluster import ClusterManager
 from binder.indices import AppIndex
@@ -15,7 +15,7 @@ from binder.service import Service
 
 class App(object):
 
-    index = AppIndex.get_index(ROOT)
+    index = AppIndex.get_index(MainSettings.ROOT)
 
     class BuildFailedException(Exception):
         pass
@@ -82,7 +82,7 @@ class App(object):
         return namespace_params("app", {
             "name": self.name,
             "id": self.app_id,
-            "notebooks-image": REGISTRY_NAME + "/" + self.name,
+            "notebooks-image": MainSettings.REGISTRY_NAME + "/" + self.name,
             "notebooks-port": 8888
         })
 
@@ -101,10 +101,10 @@ class App(object):
             raise App.BuildFailedException("could not fetch repository")
 
     def _get_base_image_name(self):
-        return REGISTRY_NAME + "/" + "binder-base"
+        return MainSettings.REGISTRY_NAME + "/" + "binder-base"
 
     def _get_image_name(self):
-        return REGISTRY_NAME + "/" + self.name
+        return MainSettings.REGISTRY_NAME + "/" + self.name
 
     def _build_with_dockerfile(self, build_path):
         # build the app image from the repository's Dockerfile
@@ -215,20 +215,20 @@ class App(object):
     def _build_base_image(self):
         # make sure the base image is built
         print "Building base image..."
-        images_path = os.path.join(ROOT, "images")
+        images_path = os.path.join(MainSettings.ROOT, "images")
         try:
             base_img = os.path.join(images_path, "base")
             image_name = self._get_base_image_name()
             subprocess.check_call(['docker', 'build', '-t', image_name, base_img])
             print("Squashing and pushing {} to private registry...".format(image_name))
-            subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
+            subprocess.check_call([os.path.join(MainSettings.ROOT, "util", "squash-and-push"), image_name])
         except subprocess.CalledProcessError as e:
             print("Could not build the base image: {}".format(e))
             raise App.BuildFailedException("could not build the base image")
 
     def _fill_templates(self, build_path):
         print "Copying files and filling templates..."
-        images_path = os.path.join(ROOT, "images")
+        images_path = os.path.join(MainSettings.ROOT, "images")
         for img in os.listdir(images_path):
             img_path = os.path.join(images_path, img)
             bd_path = os.path.join(build_path, img)
@@ -241,7 +241,7 @@ class App(object):
         try:
             image_name = self._get_image_name()
             print("Squashing and pushing {} to private registry...".format(image_name))
-            subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
+            subprocess.check_call([os.path.join(MainSettings.ROOT, "util", "squash-and-push"), image_name])
         except subprocess.CalledProcessError:
             raise App.BuildFailedException("Could not push {0} to the private registry".format(self.name))
 
@@ -313,7 +313,7 @@ class App(object):
         app_params = self.get_app_params()
 
         # load all the template strings
-        templates_path = os.path.join(ROOT, "templates")
+        templates_path = os.path.join(MainSettings.ROOT, "templates")
         template_names = ["namespace.json", "pod.json", "service-pod.json", "notebook.json",
                           "controller.json", "service.json"]
         templates = {}

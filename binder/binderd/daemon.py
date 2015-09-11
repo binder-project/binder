@@ -7,7 +7,7 @@ from zmq.eventloop.ioloop import IOLoop
 from mdp import MDPBroker
 
 from binder.settings import BinderDSettings
-import binder.binderd.modules as modules
+from binder.binderd import modules
 from binder.binderd.client import BinderClient
 
 class BinderDProcess(Process):
@@ -18,6 +18,7 @@ class BinderDProcess(Process):
     class ControlThread(Thread):
 
         def __init__(self, binderd):        
+            super(BinderDProcess.ControlThread, self).__init__()
             self.binderd = binderd
             self._stopped = False
 

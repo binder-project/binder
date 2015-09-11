@@ -1,7 +1,8 @@
 import shutil
 import os
 import re
-import settings
+
+from settings import MainSettings
 
 def namespace_params(ns, params):
     ns_params = {}
@@ -46,7 +47,7 @@ def get_binder_home():
 
 def get_env_string():
     env = [
-        "BINDER_HOME={}".format(settings.ROOT),
+        "BINDER_HOME={}".format(MainSettings.ROOT),
         "KUBERNETES_PROVIDER={}".format(os.environ["KUBERNETES_PROVIDER"]),
         "PYTHONPATH=$PYTHONPATH:{}".format(get_binder_home())
     ]

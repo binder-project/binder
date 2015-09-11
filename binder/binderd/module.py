@@ -1,8 +1,9 @@
 import json
 
+from multiprocessing import Process
+
 import zmq
 from zmq.eventloop.ioloop import IOLoop
-
 from mdp import MDPWorker
 
 from binder.settings import BinderDSettings
@@ -14,7 +15,7 @@ class BinderDModule(Process):
     class Worker(MDPWorker):
         
         def __init__(self, module, context, url, tag):
-            super(MDPWorker, self).__init__(context, url, tag)
+            super(BinderDModule.Worker, self).__init__(context, url, tag)
             self.module = module
 
         def on_request(self, msg):
@@ -23,7 +24,7 @@ class BinderDModule(Process):
             """
             msg = json.loads(msg)
             if not 'type' in msg:
-                continue
+                return
             elif 'type' == 'stop':
                 self.module._handle_stop()
                 self.module.stop()
@@ -31,13 +32,15 @@ class BinderDModule(Process):
                 self.module._handle_message(msg)
 
     def __init__(self):
+        super(BinderDModule, self).__init__()
+        self.name = self.__class__.__name__
         self.daemon = True
         self._stopped = False
 
     def _connect(self):
         context = zmq.Context()
         url = "{0}:{1}".format(BinderDSettings.BROKER_HOST, BinderDSettings.BROKER_PORT)
-        worker = BinderDModule.Worker(context, url, bytes(self.TAG))
+        worker = BinderDModule.Worker(self, context, url, bytes(self.TAG))
         IOLoop.instance().start()
         worker.shutdown()
 
