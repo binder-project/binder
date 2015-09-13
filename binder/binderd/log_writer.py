@@ -30,6 +30,8 @@ class LogWriter(BinderDModule):
         self._app_loggers = None
         self._root_logger = None
 
+        self._pub_sock = None
+
     def stop(self):
         self._stopped = True
 
@@ -73,7 +75,7 @@ class LogWriter(BinderDModule):
                 logger = self._make_app_logger(app.name)
                 self._app_loggers[app.name] = logger 
 
-    def _get_logger(app):
+    def _get_logger(self, app):
         return self._app_loggers.get(app)
 
     def _initialize(self):
@@ -84,6 +86,14 @@ class LogWriter(BinderDModule):
 
         self._configure_root_logger()
         self._configure_app_loggers()
+
+        # start the publisher socket
+        context = zmq.Context()
+        self._pub_sock = context.socket(zmq.PUB)
+        self._pub_sock.bind("{}:{}".format(LogSettings.PUBSUB_HOST, LogSettings.PUBSUB_PORT))
+
+    def _publish_msg(self, topic, msg):
+        self._pub_sock.send_multipart([bytes(topic), bytes(msg)])
 
     def _handle_log(self, msg):
         level = msg.get("level")
@@ -104,6 +114,7 @@ class LogWriter(BinderDModule):
             else:
                 logger = self._root_logger
             if level and string:
+                topic = app if app else "root"
                 if level == logging.DEBUG:
                     result_msg = "message logged as debug"
                     logger.debug(string, extra=extra)  
@@ -116,10 +127,11 @@ class LogWriter(BinderDModule):
                 elif level == logging.ERROR:
                     result_msg = "message logged as error"
                     logger.error(string, extra=extra)  
+                # publish the logged message as well
+                self._publish_msg(topic, string)
         except Exception as e:
             return self._error_msg("logging error: {}".format(e))
         return self._success_msg(result_msg)
-
 
     def _handle_message(self, msg):
         """

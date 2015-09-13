@@ -158,7 +158,14 @@ class App(object):
         # build the app image
         try:
             image_name = self._get_image_name().lower()
-            subprocess.check_call(['docker', 'build', '-t', image_name, os.path.join(app_img_path, "repo")])
+            cmd = ['docker', 'build', '-t', image_name, os.path.join(app_img_path, "repo")]
+            proc = subprocess.Popen(cmd, stdout=PIPE, stderr=subprocess.STDOUT)
+            output, error = proc.communicate()
+            write_stream(self.TAG, "info", output, app=self.name)
+            write_stream(self.TAG, "error", error, app=self.name)
+            exit_code = proc.wait()
+            if exit_code != 0:
+                raise subprocess.CalledProcessError("command {0} failed with exit code {1}".format(cmd, exit_code))
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
 
@@ -212,7 +219,14 @@ class App(object):
         # build the app image
         try:
             image_name = self._get_image_name().lower()
-            subprocess.check_call(['docker', 'build', '-t', image_name, app_img_path])
+            cmd = ['docker', 'build', '-t', image_name, app_img_path]
+            proc = subprocess.Popen(cmd, stdout=PIPE, stderr=subprocess.STDOUT)
+            output, error = proc.communicate()
+            write_stream(self.TAG, "info",  output, app=self.name)
+            write_stream(self.TAG, "error", error, app=self.name)
+            exit_code = proc.wait()
+            if exit_code != 0:
+                raise subprocess.CalledProcessError("command {0} failed with exit code {1}".format(cmd, exit_code))
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
 

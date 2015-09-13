@@ -24,8 +24,11 @@ class LogSettings(object):
     ROOT_FILE = "binder.log"
     LEVEL = logging.DEBUG
 
-    HOST = "tcp://127.0.0.1"
-    PORT = "9090"
+    PUBSUB_HOST = "tcp://127.0.0.1"
+    PUBSUB_PORT = "9093"
+
+    TIME_FORMAT = "%Y-%m-%d %H:%M:%S,%f"
+    EXTRACT_TIME = lambda string: " ".join(string.split()[:2])
 
 # binderd
 class BinderDSettings(object):

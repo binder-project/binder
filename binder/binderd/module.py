@@ -51,10 +51,10 @@ class BinderDModule(Process):
         worker.shutdown()
 
     def _error_msg(self, error):
-        return {"type": "error", "msg": "{}".format(error)}
+        return {"type": "error", "msg": error}
 
     def _success_msg(self, msg):
-        return {"type": "success", "msg": "{}".format(msg)}
+        return {"type": "success", "msg": msg}
 
     def _initialize(self):
         """

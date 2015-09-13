@@ -241,7 +241,7 @@ class KubernetesManager(ClusterManager):
                 body = {'target': "http://" + ip + ":8888"}
                 h = {"Authorization": "token {}".format(token)}
                 proxy_url = base_url + "/" + app_id
-                debugLog(self.TAG, "body: {}, headers: {}, proxy_url: {}".format(body, h, proxy_url))
+                debug_log(self.TAG, "body: {}, headers: {}, proxy_url: {}".format(body, h, proxy_url))
                 try:
                     r = requests.post(proxy_url, data=json.dumps(body), headers=h)
                     if r.status_code == 201:
