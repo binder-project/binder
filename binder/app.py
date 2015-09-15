@@ -29,6 +29,10 @@ class App(object):
         FAILED = "FAILED"
 
     @staticmethod
+    def make_app_name(org, repo):
+        return (org + "-" + repo).lower()
+
+    @staticmethod
     def get_app(name=None):
         apps = App.index.find_apps()
         if not name:
@@ -67,8 +71,6 @@ class App(object):
 
         self.app_id = App._get_deployment_id()
 
-        self.build_time = 0
-
         # create the app directory
         self.dir = App.index.make_app_path(self)
 
@@ -79,6 +81,10 @@ class App(object):
     @property
     def build_state(self):
         return App.index.get_build_state(self)
+
+    @property
+    def last_build_time(self):
+        return App.index.get_last_build_time(self)
 
     def get_app_params(self):
         # TODO some of these should be moved into some sort of a Defaults class (config file?)
@@ -159,13 +165,12 @@ class App(object):
         try:
             image_name = self._get_image_name().lower()
             cmd = ['docker', 'build', '-t', image_name, os.path.join(app_img_path, "repo")]
-            proc = subprocess.Popen(cmd, stdout=PIPE, stderr=subprocess.STDOUT)
-            output, error = proc.communicate()
-            write_stream(self.TAG, "info", output, app=self.name)
-            write_stream(self.TAG, "error", error, app=self.name)
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            write_stream(self.TAG, "info", proc.stdout, app=self.name)
+            write_stream(self.TAG, "error", proc.stderr, app=self.name)
             exit_code = proc.wait()
             if exit_code != 0:
-                raise subprocess.CalledProcessError("command {0} failed with exit code {1}".format(cmd, exit_code))
+                raise subprocess.CalledProcessError(exit_code, cmd=cmd)
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
 
@@ -220,13 +225,12 @@ class App(object):
         try:
             image_name = self._get_image_name().lower()
             cmd = ['docker', 'build', '-t', image_name, app_img_path]
-            proc = subprocess.Popen(cmd, stdout=PIPE, stderr=subprocess.STDOUT)
-            output, error = proc.communicate()
-            write_stream(self.TAG, "info",  output, app=self.name)
-            write_stream(self.TAG, "error", error, app=self.name)
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            write_stream(self.TAG, "info", proc.stdout, app=self.name)
+            write_stream(self.TAG, "error", proc.stderr, app=self.name)
             exit_code = proc.wait()
             if exit_code != 0:
-                raise subprocess.CalledProcessError("command {0} failed with exit code {1}".format(cmd, exit_code))
+                raise subprocess.CalledProcessError(exit_code, cmd=cmd)
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
 
@@ -273,6 +277,7 @@ class App(object):
             build_path = os.path.join(self.path, "build")
             make_dir(build_path, clean=True)
             App.index.update_build_state(self, App.BuildState.BUILDING)
+            App.index.update_last_build_time(self)
 
             # fetch the repo
             self._fetch_repo()
@@ -307,7 +312,7 @@ class App(object):
 
         except App.BuildFailedException as e:
             App.index.update_build_state(self, App.BuildState.FAILED)
-            error_log(self.TAG, e, app=self.name)
+            error_log(self.TAG, str(e), app=self.name)
             return
 
         info_log(self.TAG, "Successfully built app {0}".format(self.name), app=self.name)

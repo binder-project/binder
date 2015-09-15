@@ -28,7 +28,9 @@ class LogSettings(object):
     PUBSUB_PORT = "9093"
 
     TIME_FORMAT = "%Y-%m-%d %H:%M:%S,%f"
-    EXTRACT_TIME = lambda string: " ".join(string.split()[:2])
+    @staticmethod
+    def EXTRACT_TIME(string):
+        return " ".join(string.split()[:2])
 
 # binderd
 class BinderDSettings(object):

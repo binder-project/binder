@@ -2,15 +2,20 @@ import Queue
 import json
 import signal
 import time
+import datetime
+from threading import Thread
 
 from tornado import gen
 from tornado.ioloop import IOLoop
 from tornado.web import Application, RequestHandler
 from tornado.httpserver import HTTPServer
+from tornado.websocket import WebSocketHandler
 
 from binder.service import Service
 from binder.app import App
 from binder.cluster import ClusterManager
+from binder.log import AppLogStreamer 
+from binder.settings import LogSettings
 
 from .builder import Builder
 
@@ -22,6 +27,8 @@ QUEUE_SIZE = 50
 ALLOW_ORIGIN = True
 
 build_queue = Queue.Queue(QUEUE_SIZE)
+
+ws_handlers = []
 
 class BinderHandler(RequestHandler):
 
@@ -56,15 +63,12 @@ class GithubHandler(BuildHandler):
         # in the GithubHandler, the repo field is inferred from organization/repo
         return "repo" in spec
 
-    def _make_app_name(self, organization, repo):
-        return (organization + "-" + repo).lower()
-
 
 class GithubStatusHandler(GithubHandler):
 
     def get(self, organization, repo):
         super(GithubStatusHandler, self).get()
-        app_name = self._make_app_name(organization, repo)
+        app_name = App.make_app_name(organization, repo)
         app = App.get_app(app_name)
         if not app:
             self.set_status(404)
@@ -80,7 +84,7 @@ class GithubBuildHandler(GithubHandler):
         # if the app is still building, return an error. If the app is built, deploy it and return
         # the redirect url
         super(GithubHandler, self).get()
-        app_name = self._make_app_name(organization, repo)
+        app_name = App.make_app_name(organization, repo)
         app = App.get_app(app_name)
         if app and app.build_state == App.BuildState.COMPLETED:
             redirect_url = app.deploy("single-node")
@@ -99,7 +103,7 @@ class GithubBuildHandler(GithubHandler):
             self.write({"error": "malformed app specification"})
         else:
             try:
-                spec["name"] = self._make_app_name(organization, repo).lower()
+                spec["name"] = App.make_app_name(organization, repo).lower()
                 spec["repo"] = "https://www.github.com/{0}/{1}".format(organization, repo)
                 build_queue.put(spec)
                 self.write({"success": "app submitted to build queue"})
@@ -147,11 +151,50 @@ class CapacityHandler(BinderHandler):
             CapacityHandler.last_poll = time.time()
         self.write({"capacity": self.cached_capacity, "running": running})
 
+
+class BuildLogsHandler(WebSocketHandler):
+
+    def __init__(self, application, request, **kwargs):
+        super(BuildLogsHandler, self).__init__(application, request, **kwargs)
+        self._thread = None
+
+    def stop(self):
+        if self._thread:
+            print "Removing websocket handler"
+            self._thread.stop()
+            ws_handlers.remove(self)
+
+    def check_origin(self, origin):
+        return True
+
+    def write_message(self, msg):
+        print "In BuildLogsHandler.write_message..."
+        super(BuildLogsHandler, self).write_message(msg)
+
+    def open(self, organization, repo):
+        print("Opening websocket for {}/{}".format(organization, repo))
+        app_name = App.make_app_name(organization, repo)
+        app = App.get_app(app_name)
+        time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
+
+        ws_handlers.append(self)
+
+        self._thread = AppLogStreamer(app_name, time_string, self.write_message)
+        self._thread.start()
+        
+    def on_message(self, message):
+        pass
+
+    def on_close(self):
+        self.stop()
+
 def sig_handler(sig, frame):
     IOLoop.instance().add_callback(shutdown)
 
 def shutdown():
     print("Shutting down...")
+    for handler in ws_handlers:
+        handler.stop()
     IOLoop.instance().stop()
     builder.stop()
 
@@ -159,6 +202,7 @@ def main():
 
     application = Application([
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)/status", GithubStatusHandler),
+        (r"/apps/(?P<organization>.+)/(?P<repo>.+)/logs", BuildLogsHandler),
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubBuildHandler),
         (r"/apps/(?P<app_id>.+)", OtherSourceHandler),
         (r"/services", ServicesHandler),

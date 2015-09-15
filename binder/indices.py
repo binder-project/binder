@@ -2,8 +2,13 @@ import json
 import os
 import tempfile
 import shutil
+import time
+import datetime
+
+import pymongo
 
 from binder.utils import make_dir
+from binder.settings import LogSettings
 
 
 class AppIndex(object):
@@ -18,7 +23,7 @@ class AppIndex(object):
     @staticmethod
     def get_index(*args, **kwargs):
         if not AppIndex._singleton:
-            AppIndex._singleton = FileAppIndex(*args, **kwargs)
+            AppIndex._singleton = MongoAppIndex(*args, **kwargs)
         return AppIndex._singleton
 
     def create(self, spec):
@@ -34,6 +39,12 @@ class AppIndex(object):
         pass
 
     def get_build_state(self, app):
+        pass
+
+    def update_last_build_time(self, app, time):
+        pass
+
+    def get_last_build_time(self, app):
         pass
 
     def save_app(self, app):
@@ -107,6 +118,40 @@ class FileAppIndex(AppIndex):
         info_log(self.TAG, "app currently must be rebuilt before each launch")
 
 
+class MongoAppIndex(FileAppIndex):
+
+    # TODO Mongo setup -> create a deprivileged user, etc. -> MongoAppIndex will also NOT 
+    # inherit from FileAppIndex
+
+    def __init__(self, root):
+        super(MongoAppIndex, self).__init__(root)
+        self._client = pymongo.MongoClient()
+        self._app_db = self._client.app_db
+        self._apps = self._app_db.apps
+
+    def update_build_state(self, app, state):
+        super(FileAppIndex, self).update_build_state(app, state)
+
+    def get_build_state(self, app):
+        super(FileAppIndex, self).get_build_state(app)
+
+    def update_last_build_time(self, app, time=None):
+        if not time:
+            time = datetime.datetime.now().strftime(LogSettings.TIME_FORMAT)
+        query = {"app": app.name}
+        update = {"$set": {"build_time": time}}
+        self._apps.update_one(query, update, upsert=True)
+
+    def get_last_build_time(self, app):
+        query = {"app": app.name}
+        projection = ["build_time"]
+        res = self._apps.find_one(query, projection=projection)
+        if not res:
+            return None
+        bt = res["build_time"]
+        return datetime.datetime.strptime(bt, LogSettings.TIME_FORMAT)
+        
+        
 class ServiceIndex(object):
     """
     Responsible for finding and managing metadata about services

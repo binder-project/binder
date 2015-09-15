@@ -2,11 +2,12 @@ import logging
 import Queue
 import time
 
-from threading import Thread
+from threading import Thread, current_thread, Lock
 
 import zmq
 
 from binder.binderd.client import BinderClient
+from binder.settings import LogSettings
 
 class LoggerClient(Thread):
 
@@ -22,7 +23,7 @@ class LoggerClient(Thread):
 
     def __init__(self):
         super(LoggerClient, self).__init__()
-        self.daemon = True
+        self.parent = current_thread()
         self._stopped = False
 
         self._queue = Queue.Queue()
@@ -32,15 +33,16 @@ class LoggerClient(Thread):
         self._client.close()
         self._stopped= True
 
+    def _send_message(self):
+        msg = self._queue.get()
+        self._client.send(msg)
+
     def run(self):
-        while not self._stopped:
-            try:
-                if not self._queue.empty():
-                    msg = self._queue.get()
-                    self._client.send(msg)
-            except Queue.Empty:
-                # if the queue is empty, continue to the next iteration
-                pass
+        while not self._stopped and self.parent.is_alive():
+            self._send_message()
+        # keep logging until the queue is empty, even after the parent has died
+        while not self._queue.empty():
+            self._send_message()
 
     def _send(self, msg):
         self._queue.put(msg)
@@ -56,27 +58,6 @@ class LoggerClient(Thread):
 
     def error(self, tag, msg, app=None):
         self._send({'type': 'log', 'level': logging.ERROR, 'msg': msg, 'tag': tag, 'app': app})
-
-
-class SubStreamReader(Thread):
-
-    def __init__(self, buf):
-        super(StreamReader, self).__init__()
-        self._stopped = False
-        self._buf = buf
-
-    def stop(self):
-        self._stopped = True
-
-    def run(self):
-        context = zmq.Context()
-        socket = context.socket(zmq.SUB)
-        socket.setsockopt(zmq.SUBSCRIBE, bytes(app if app else "root"))
-        socket.connect("{}:{}".format(LogSettings.PUBSUB_HOST, LogSettings.PUBSUB_PORT))
-        while not self._stopped:
-            msg = str(socket.recv())
-            # buffer the message
-            self._buf.put(msg)
 
 
 def debug_log(tag, msg, app=None):
@@ -96,7 +77,7 @@ def error_log(tag, msg, app=None):
     log.error(tag, msg, app)
 
 def write_stream(tag, level_string, stream, app=None):
-    def _process_stream(stream):
+    def _process_stream(app, stream):
         log = LoggerClient.getInstance()
         if level_string not in LoggerClient.__dict__: 
             log.error("LoggerClient", "write_stream failing with unexpected level_string: {}".format(level_string))
@@ -104,32 +85,122 @@ def write_stream(tag, level_string, stream, app=None):
         method = log.__getattribute__(level_string)
         for line in iter(stream.readline, ''):
             method(tag, line, app=app)
-    t = Thread(target=_process_stream, args=(stream,))
+    t = Thread(target=_process_stream, args=(app, stream))
     t.start()
+
+
+class PubSubStreamer(Thread):
+
+    class SubStreamReader(Thread):
+
+        def __init__(self, buf):
+            super(PubSubStreamer.SubStreamReader, self).__init__()
+            self._stopped = False
+            self._buf = buf
+
+        def stop(self):
+            self._stopped = True
+
+        def run(self):
+            context = zmq.Context()
+            socket = context.socket(zmq.SUB)
+            socket.setsockopt(zmq.SUBSCRIBE, b'')
+            socket.connect("{}:{}".format(LogSettings.PUBSUB_HOST, LogSettings.PUBSUB_PORT))
+            while not self._stopped:
+                try:
+                    topic, msg = socket.recv_multipart(zmq.NOBLOCK)
+                    # buffer the message
+                    self._buf.put((topic, msg))
+                except zmq.ZMQError:
+                    continue
+
+    _singleton = None
+
+    def __init__(self):
+        super(PubSubStreamer, self).__init__()
+        self._stopped = False
+        self._queue = Queue.Queue()
+        self._sub_reader = PubSubStreamer.SubStreamReader(self._queue)
+        self.callbacks = {}
+
+    @staticmethod
+    def get_instance():
+        if not PubSubStreamer._singleton: 
+            PubSubStreamer._singleton = PubSubStreamer()
+            PubSubStreamer._singleton.start()
+        return PubSubStreamer._singleton
+
+    def add_app_callback(self, app, cb):
+        if app in self.callbacks:
+            self.callbacks[app].append(cb)
+        else:
+            self.callbacks[app] = [cb]
+
+    def stop(self):
+        self._stopped = True
+        self._sub_reader.stop()
+
+    def remove_app_callback(self, app, cb):
+        if app in self.callbacks:
+            try: 
+                self.callbacks[app].remove(cb)
+            except ValueError:
+                pass
+
+    def run(self):
+        self._sub_reader.start()
+        while not self._stopped:
+            app, msg = self._queue.get()
+            if app in self.callbacks: 
+                for cb in self.callbacks[app]:
+                    cb(msg)
+
+
+class AppLogStreamer(Thread):
+
+    def __init__(self, app, start_time, callback):
+        super(AppLogStreamer, self).__init__()
+        self._stopped = False
+        self._app = app
+        self._start_time = start_time
+        self._cb = callback
+        self._pubsub_cb = None
+        PubSubStreamer.get_instance()
+
+    def stop(self): 
+        self._stopped = True
+        if self._cb:
+            PubSubStreamer.get_instance().remove_app_callback(self._app, self._pubsub_cb)
+
+    def run(self):
+        buf = Queue.Queue()
+        def buffered_cb(msg):
+            buf.put(msg)
+        self._pubsub_cb = buffered_cb 
+        PubSubStreamer.get_instance().add_app_callback(self._app, self._pubsub_cb)
             
-def read_stream(app=None, start_time=None, level=None):
-    # 1) open a REQ socket (using the standard binderd protocol) and get all logs starting at start_time
-    # 2) simultaneously, buffering the output from a log_reader subscriber socket (with app name as topic) and 
-    #    read until closed
-    # 3) write out all the logs from the RSP, recording the last timestamp of each 
-    # 4) once RSP is exhausted, write out all subscriber messages after last RSP timestamp
-    def _stream_generator():
-        buf = Queue()
-        sub_thread = SubStreamReader(buf)
-        sub_thread.start()
         bc = BinderClient("log_reader")
-        lines = bc.send({"type": "get", "app": app, "since": start_time}).get("msg")
+        rsp = bc.send({"type": "get", "app": self._app, "since": self._start_time})
+        if rsp["type"] == "success":
+            lines = rsp["msg"].split("\n")
+        else:
+            error_log("LoggerClient", "read_stream failure for app {}: {}".format(self._app, rsp))
+            return
 
         # exhaust all lines from the get request
         last_time = None
         for line in lines:
             last_time = LogSettings.EXTRACT_TIME(line)
-            yield line
+            self._cb(line)
         last_time = time.strptime(last_time, LogSettings.TIME_FORMAT)
         
         # now start reading the subscriber output (starting strictly after last_time)
-        for line in buf.get():
-            line_time = LogSettings.EXTRACT_TIME(line)
-            if line_time > last_time:
-                yield line
-           
+        while not self._stopped:
+            try: 
+                line = buf.get_nowait()
+                line_time = time.strptime(LogSettings.EXTRACT_TIME(line), LogSettings.TIME_FORMAT)
+                if line_time > last_time:
+                    self._cb(line)
+            except Queue.Empty:
+                continue
+
