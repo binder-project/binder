@@ -6,16 +6,19 @@ import time
 from memoized_property import memoized_property
 import requests
 
-from binder.settings import ROOT, REGISTRY_NAME
+from binder.settings import MainSettings
 from binder.utils import namespace_params, fill_template, fill_template_string, make_dir
 from binder.cluster import ClusterManager
 from binder.indices import AppIndex
 from binder.service import Service
+from binder.log import *
 
 
 class App(object):
+    
+    TAG = "App"
 
-    index = AppIndex.get_index(ROOT)
+    index = AppIndex.get_index(MainSettings.ROOT)
 
     class BuildFailedException(Exception):
         pass
@@ -24,6 +27,10 @@ class App(object):
         BUILDING = "BUILDING"
         COMPLETED = "COMPLETED"
         FAILED = "FAILED"
+
+    @staticmethod
+    def make_app_name(org, repo):
+        return (org + "-" + repo).lower()
 
     @staticmethod
     def get_app(name=None):
@@ -64,8 +71,6 @@ class App(object):
 
         self.app_id = App._get_deployment_id()
 
-        self.build_time = 0
-
         # create the app directory
         self.dir = App.index.make_app_path(self)
 
@@ -77,12 +82,16 @@ class App(object):
     def build_state(self):
         return App.index.get_build_state(self)
 
+    @property
+    def last_build_time(self):
+        return App.index.get_last_build_time(self)
+
     def get_app_params(self):
         # TODO some of these should be moved into some sort of a Defaults class (config file?)
         return namespace_params("app", {
             "name": self.name,
             "id": self.app_id,
-            "notebooks-image": REGISTRY_NAME + "/" + self.name,
+            "notebooks-image": MainSettings.REGISTRY_NAME + "/" + self.name,
             "notebooks-port": 8888
         })
 
@@ -97,18 +106,18 @@ class App(object):
             subprocess.check_call(cmd)
             self.repo = repo_path
         except Exception as e:
-            print("Could not fetch app repo: {}".format(e))
+            error_log(self.TAG, "Could not fetch app repo: {}".format(e), app=self.name)
             raise App.BuildFailedException("could not fetch repository")
 
     def _get_base_image_name(self):
-        return REGISTRY_NAME + "/" + "binder-base"
+        return MainSettings.REGISTRY_NAME + "/" + "binder-base"
 
     def _get_image_name(self):
-        return REGISTRY_NAME + "/" + self.name
+        return MainSettings.REGISTRY_NAME + "/" + self.name
 
     def _build_with_dockerfile(self, build_path):
         # build the app image from the repository's Dockerfile
-        print("Building the app image with Dockerfile...")
+        info_log(self.TAG, "Building the app image with Dockerfile...", app=self.name)
         app_img_path = os.path.join(build_path, "app")
         repo_path = os.path.join(app_img_path, "repo")
         repo_df_path = os.path.join(app_img_path, os.path.join(repo_path, "Dockerfile"))
@@ -120,7 +129,8 @@ class App(object):
                     if line.startswith("FROM "):
                         # TODO very crude base image check
                         if not line.strip().endswith("/binder-base"):
-                            print("Dockerfile base image is not binder-base. Building may fail.")
+                            msg = "Dockerfile base image is not binder-base. Building may fail."
+                            warning_log(self.TAG, msg, app=self.name)
                         return False
                     return True
 
@@ -154,7 +164,13 @@ class App(object):
         # build the app image
         try:
             image_name = self._get_image_name().lower()
-            subprocess.check_call(['docker', 'build', '-t', image_name, os.path.join(app_img_path, "repo")])
+            cmd = ['docker', 'build', '-t', image_name, os.path.join(app_img_path, "repo")]
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            write_stream(self.TAG, "info", proc.stdout, app=self.name)
+            write_stream(self.TAG, "error", proc.stderr, app=self.name)
+            exit_code = proc.wait()
+            if exit_code != 0:
+                raise subprocess.CalledProcessError(exit_code, cmd=cmd)
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
 
@@ -162,7 +178,7 @@ class App(object):
         # construct the app image Dockerfile
         app_img_path = os.path.join(build_path, "app")
         repo_path = os.path.join(app_img_path, "repo")
-        print("Building app image without Dockerfile...")
+        info_log(self.TAG, "Building app image without Dockerfile...", app=self.name)
         with open(os.path.join(app_img_path, "Dockerfile"), 'w+') as app:
 
             app.write("FROM {}\n".format(self._get_base_image_name()))
@@ -208,27 +224,33 @@ class App(object):
         # build the app image
         try:
             image_name = self._get_image_name().lower()
-            subprocess.check_call(['docker', 'build', '-t', image_name, app_img_path])
+            cmd = ['docker', 'build', '-t', image_name, app_img_path]
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            write_stream(self.TAG, "info", proc.stdout, app=self.name)
+            write_stream(self.TAG, "error", proc.stderr, app=self.name)
+            exit_code = proc.wait()
+            if exit_code != 0:
+                raise subprocess.CalledProcessError(exit_code, cmd=cmd)
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
 
     def _build_base_image(self):
         # make sure the base image is built
-        print "Building base image..."
-        images_path = os.path.join(ROOT, "images")
+        info_log(self.TAG, "Building base image...", app=self.name)
+        images_path = os.path.join(MainSettings.ROOT, "images")
         try:
             base_img = os.path.join(images_path, "base")
             image_name = self._get_base_image_name()
             subprocess.check_call(['docker', 'build', '-t', image_name, base_img])
-            print("Squashing and pushing {} to private registry...".format(image_name))
-            subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
+            info_log(self.TAG, "Squashing and pushing {} to private registry...".format(image_name), app=self.name)
+            subprocess.check_call([os.path.join(MainSettings.ROOT, "util", "squash-and-push"), image_name])
         except subprocess.CalledProcessError as e:
-            print("Could not build the base image: {}".format(e))
+            error_log(self.TAG, "Could not build the base image: {}".format(e), app=self.name)
             raise App.BuildFailedException("could not build the base image")
 
     def _fill_templates(self, build_path):
-        print "Copying files and filling templates..."
-        images_path = os.path.join(ROOT, "images")
+        info_log(self.TAG, "Copying files and filling templates...", app=self.name)
+        images_path = os.path.join(MainSettings.ROOT, "images")
         for img in os.listdir(images_path):
             img_path = os.path.join(images_path, img)
             bd_path = os.path.join(build_path, img)
@@ -240,13 +262,13 @@ class App(object):
     def _push_image(self):
         try:
             image_name = self._get_image_name()
-            print("Squashing and pushing {} to private registry...".format(image_name))
-            subprocess.check_call([os.path.join(ROOT, "util", "squash-and-push"), image_name])
+            info_log(self.TAG, "Squashing and pushing {} to private registry...".format(image_name), app=self.name)
+            subprocess.check_call([os.path.join(MainSettings.ROOT, "util", "squash-and-push"), image_name])
         except subprocess.CalledProcessError:
             raise App.BuildFailedException("Could not push {0} to the private registry".format(self.name))
 
     def _preload_image(self):
-        print("Preloading app image onto all nodes...")
+        info_log(self.TAG, "Preloading app image onto all nodes...", app=self.name)
         cm = ClusterManager.get_instance().preload_image(self.name)
      
     def build(self, build_base=False, preload=False):
@@ -255,12 +277,13 @@ class App(object):
             build_path = os.path.join(self.path, "build")
             make_dir(build_path, clean=True)
             App.index.update_build_state(self, App.BuildState.BUILDING)
+            App.index.update_last_build_time(self)
 
             # fetch the repo
             self._fetch_repo()
 
             # ensure that the service dependencies are all build
-            print "Building service dependencies..."
+            info_log(self.TAG, "Building service dependencies...", app=self.name)
             for service in self.services:
                 built_service = service.build()
                 if not built_service:
@@ -289,10 +312,10 @@ class App(object):
 
         except App.BuildFailedException as e:
             App.index.update_build_state(self, App.BuildState.FAILED)
-            print(e)
+            error_log(self.TAG, str(e), app=self.name)
             return
 
-        print("Successfully built app {0}".format(self.name))
+        info_log(self.TAG, "Successfully built app {0}".format(self.name), app=self.name)
         App.index.update_build_state(self, App.BuildState.COMPLETED)
 
     def deploy(self, mode):
@@ -313,7 +336,7 @@ class App(object):
         app_params = self.get_app_params()
 
         # load all the template strings
-        templates_path = os.path.join(ROOT, "templates")
+        templates_path = os.path.join(MainSettings.ROOT, "templates")
         template_names = ["namespace.json", "pod.json", "service-pod.json", "notebook.json",
                           "controller.json", "service.json"]
         templates = {}
@@ -344,10 +367,11 @@ class App(object):
 
         if success:
             app_id = app_params["app.id"]
-            print("Successfully deployed app {0} in {1} mode with ID {2}".format(self.name, mode, app_id))
+            msg = "Successfully deployed app {0} in {1} mode with ID {2}".format(self.name, mode, app_id)
+            info_log(self.TAG, msg, app=self.name)
             return redirect_url
         else:
-            print("Failed to deploy app {0} in {1} mode.".format(self.name, mode))
+            error_log(self.TAG, "Failed to deploy app {0} in {1} mode.".format(self.name, mode), app=self.name)
             return None
 
     def destroy(self):

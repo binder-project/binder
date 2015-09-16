@@ -46,8 +46,4 @@ ENV PATH $HOME/anaconda/bin:$PATH
 RUN conda create -n python3 python=3.3 anaconda
 RUN /bin/bash -c "source activate python3 && ipython kernelspec install-self --user"
 
-# Convert notebooks to the current format
-# RUN find . -name '*.ipynb' -exec ipython nbconvert --to notebook {} --output {} \;
-# RUN find . -name '*.ipynb' -exec ipython trust {} \;
-
 ENV SHELL /bin/bash

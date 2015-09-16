@@ -1,7 +1,9 @@
 import shutil
 import os
 import re
-import settings
+
+from settings import MainSettings
+from binder.log import *
 
 def namespace_params(ns, params):
     ns_params = {}
@@ -30,7 +32,7 @@ def fill_template(template_path, params):
                 replaced = pattern.sub(new, replaced)
             template.write(replaced)
     except (IOError, TypeError) as e:
-        print("Could not fill template {0}: {1}".format(template_path, e))
+        error_log("fill_template", "Could not fill template {0}: {1}".format(template_path, e))
 
 def make_dir(path, clean=False):
     if os.path.isdir(path):
@@ -46,7 +48,7 @@ def get_binder_home():
 
 def get_env_string():
     env = [
-        "BINDER_HOME={}".format(settings.ROOT),
+        "BINDER_HOME={}".format(MainSettings.ROOT),
         "KUBERNETES_PROVIDER={}".format(os.environ["KUBERNETES_PROVIDER"]),
         "PYTHONPATH=$PYTHONPATH:{}".format(get_binder_home())
     ]

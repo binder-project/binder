@@ -12,12 +12,14 @@ from crontab import CronTab
 from memoized_property import memoized_property
 from multiprocess import Pool
 
-from binder.settings import ROOT, REGISTRY_NAME, DOCKER_HUB_USER, APP_CRON_PERIOD
+from binder.settings import MainSettings, MonitoringSettings
 from binder.utils import fill_template_string, get_env_string
+from binder.log import *
 
 
 class ClusterManager(object):
 
+    TAG = "ClusterManager"
     CLUSTER_HOST = "app.mybinder.org"
 
     # the singleton manager
@@ -58,6 +60,8 @@ class ClusterManager(object):
 
 
 class KubernetesManager(ClusterManager):
+    
+    TAG = "KubernetesManager"
 
     pool = Pool(5)
 
@@ -68,7 +72,7 @@ class KubernetesManager(ClusterManager):
             output = subprocess.check_output(cmd)
             return output.split("/cluster/kubectl.sh")[0]
         except subprocess.CalledProcessError as e:
-            print("Could not get Kubernetes home: {}".format(e))
+            error_log(self.TAG, "Could not get Kubernetes home: {}".format(e))
             return None
 
     def _generate_auth_token(self):
@@ -82,7 +86,8 @@ class KubernetesManager(ClusterManager):
                 cmd.append('--namespace={0}'.format(namespace))
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError as e:
-            print("Could not deploy specification: {0} on Kubernetes cluster: {1}".format(path, e))
+            msg = "Could not deploy specification: {0} on Kubernetes cluster: {1}".format(path, e)
+            error_log(self.TAG, msg)
             success = False
         return success
 
@@ -93,7 +98,7 @@ class KubernetesManager(ClusterManager):
             ip_re = re.compile("LoadBalancer Ingress:(?P<ip>.*)\n")
             m = ip_re.search(output)
             if not m:
-                print("Could not extract IP from service description")
+                error_log(self.TAG, "Could not extract IP from service description")
                 return None
             return m.group("ip").strip()
         except subprocess.CalledProcessError as e:
@@ -117,38 +122,38 @@ class KubernetesManager(ClusterManager):
             ready_re = re.compile("State:\s+(?P<ready>.*)")
             m = ip_re.search(output)
             if not m:
-                print("Could not extract IP from pod description")
+                info_log(self.TAG, "Could not extract IP from pod description")
                 return None
             return m.group("ip").strip()
 
             # TODO the following code makes the above check safer (will prevent proxy errors) but is too slow
             ready = ready_re.search(output)
             if not ready:
-                print("Extracted the pod IP, but the notebook container is not ready")
+                warning_log(self.TAG, "Extracted the pod IP, but the notebook container is not ready")
                 return None 
             else:
                 status = ready.group("ready").lower().strip()
-                print "status: {}".format(status)
+                debug_log(self.TAG, "status: {}".format(status))
                 if status != "running":
-                    print("Extracted the pod IP, but the notebook container is not ready")
+                    info_log(self.TAG, "Extracted the pod IP, but the notebook container is not ready")
                     return None
 
         except subprocess.CalledProcessError as e:
             return None
 
     def _launch_registry_server(self):
-        registry_path = os.path.join(ROOT, "registry")
+        registry_path = os.path.join(MainSettings.ROOT, "registry")
 
         for name in os.listdir(registry_path):
             self._create(os.path.join(registry_path, name))
 
-        print("Sleeping for 10 seconds so registry launch can complete...")
+        info_log(self.TAG, "Sleeping for 10 seconds so registry launch can complete...")
         time.sleep(10)
 
     def _launch_proxy_server(self, token):
 
         # TODO the following chunk of code is reused in App.deploy (should be abstracted away)
-        proxy_path = os.path.join(ROOT, "proxy")
+        proxy_path = os.path.join(MainSettings.ROOT, "proxy")
 
          # clean up the old deployment
         deploy_path = os.path.join(proxy_path, "deploy")
@@ -175,22 +180,22 @@ class KubernetesManager(ClusterManager):
             self._create(os.path.join(deploy_path, name))
 
     def _read_proxy_info(self):
-        with open(os.path.join(ROOT, ".proxy_info"), "r") as proxy_file:
+        with open(os.path.join(MainSettings.ROOT, ".proxy_info"), "r") as proxy_file:
             raw_host, raw_token = proxy_file.readlines()
             return "http://" + raw_host.strip() + "/api/routes", raw_token.strip()
 
     def _write_proxy_info(self, url, token):
-        with open(os.path.join(ROOT, ".proxy_info"), "w+") as proxy_file:
+        with open(os.path.join(MainSettings.ROOT, ".proxy_info"), "w+") as proxy_file:
             proxy_file.write("{}\n".format(url))
             proxy_file.write("{}\n".format(token))
 
     def _read_registry_url(self):
-        with open(os.path.join(ROOT, ".registry_info"), "r") as registry_file:
+        with open(os.path.join(MainSettings.ROOT, ".registry_info"), "r") as registry_file:
             url = registry_file.readlines()[0]
             return url
 
     def _write_registry_url(self, url):
-        with open(os.path.join(ROOT, ".registry_info"), "w+") as registry_file:
+        with open(os.path.join(MainSettings.ROOT, ".registry_info"), "w+") as registry_file:
             registry_file.write("{}\n".format(url))
 
     def _get_inactive_routes(self, min_inactive):
@@ -200,14 +205,14 @@ class KubernetesManager(ClusterManager):
         base_url, token = self._read_proxy_info()
         h = {"Authorization": "token {}".format(token)}
         proxy_url = base_url + "?inactive_since={}".format(threshold)
-        print("proxy_url: {}".format(proxy_url))
+        debug_log(self.TAG, "proxy_url: {}".format(proxy_url))
         try:
             r = requests.get(proxy_url, headers=h)
             if r.status_code == 200:
                 routes = r.json().keys()
                 return map(lambda r: r[1:], routes)
         except requests.exceptions.ConnectionError:
-            print("Could not get all routes inactive for {} minutes".format(min_inactive))
+            warning_log(self.TAG, "Could not get all routes inactive for {} minutes".format(min_inactive))
         return None
 
     def _remove_proxy_route(self, app_id):
@@ -217,10 +222,10 @@ class KubernetesManager(ClusterManager):
         try:
             r = requests.delete(proxy_url, headers=h)
             if r.status_code == 204:
-                print("Removed proxy route for {}".format(app_id))
+                info_log(self.TAG, "Removed proxy route for {}".format(app_id))
                 return True
         except requests.exceptions.ConnectionError:
-            print("Could not remove proxy route for {}".format(app_id))
+            error_log(self.TAG, "Could not remove proxy route for {}".format(app_id))
         return False
 
     def _register_proxy_route(self, app_id):
@@ -236,17 +241,18 @@ class KubernetesManager(ClusterManager):
                 body = {'target': "http://" + ip + ":8888"}
                 h = {"Authorization": "token {}".format(token)}
                 proxy_url = base_url + "/" + app_id
-                print("body: {}, headers: {}, proxy_url: {}".format(body, h, proxy_url))
+                debug_log(self.TAG, "body: {}, headers: {}, proxy_url: {}".format(body, h, proxy_url))
                 try:
                     r = requests.post(proxy_url, data=json.dumps(body), headers=h)
                     if r.status_code == 201:
-                        print("Proxying {} to {}".format(proxy_url, ip + ":8888"))
+                        info_log(self.TAG, "Proxying {} to {}".format(proxy_url, ip + ":8888"))
                         return True
                     else:
                         raise Exception("could not register route with proxy server")
                 except requests.exceptions.ConnectionError:
+                    error_log(self.TAG, "could not connect to proxy server")
                     pass
-            print("App not yet assigned an IP address. Waiting for {} seconds...".format(pause))
+            info_log(self.TAG, "App not yet assigned an IP address. Waiting for {} seconds...".format(pause))
             time.sleep(pause)
 
         return False
@@ -256,7 +262,7 @@ class KubernetesManager(ClusterManager):
             output = subprocess.check_output(['kubectl.sh', 'get', 'namespaces'])
             return map(lambda line: line.split()[0], output.split('\n')[1:-1]) 
         except subprocess.CalledProcessError as e:
-            print("Couldn't get running apps: {}".format(e))
+            error_log(self.TAG, "Couldn't get running apps: {}".format(e))
         return None
 
     def _nodes_command(self, func):
@@ -273,7 +279,7 @@ class KubernetesManager(ClusterManager):
                     if m:
                         zone = m.group("zone")
                     else:
-                        print("zone could not be determined")
+                        error_log(self.TAG, "zone could not be determined")
             if not zone:
                 return False
 
@@ -288,7 +294,7 @@ class KubernetesManager(ClusterManager):
             return []
 
         else:
-            print("Only aws and gce providers are currently supported")
+            warning_log(self.TAG, "Only aws and gce providers are currently supported")
             return []
 
     def get_total_capacity(self):
@@ -313,18 +319,18 @@ class KubernetesManager(ClusterManager):
             if len(split) > 0:
                 node_name = split[0]
                 if node_name != "kubernetes-master":
-                    print("Preloading {0} onto {1}...".format(image_name, node_name))
-                    docker_cmd = "sudo docker pull {0}/{1}".format(REGISTRY_NAME, image_name)
+                    info_log(self.TAG, "Preloading {0} onto {1}...".format(image_name, node_name))
+                    docker_cmd = "sudo docker pull {0}/{1}".format(MainSettings.REGISTRY_NAME, image_name)
                     cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
                            "--command", "{}".format(docker_cmd)]
                     return subprocess.Popen(cmd)
             return None
         procs = self._nodes_command(_preload)
-        print("Waiting for preloading to finish...")
+        info_log(self.TAG, "Waiting for preloading to finish...")
         for proc in procs:
             if proc:
                 proc.wait()
-        print("Preloaded image {} onto all nodes".format(image_name))
+        info_log(self.TAG, "Preloaded image {} onto all nodes".format(image_name))
         return True
 
     def _start_proxy_server(self):
@@ -332,16 +338,16 @@ class KubernetesManager(ClusterManager):
         self._launch_proxy_server(token)
         num_retries = 5
         for i in range(num_retries):
-            print("Sleeping for 20s before getting proxy URL")
+            debug_log(self.TAG, "Sleeping for 20s before getting proxy URL")
             time.sleep(20)
             proxy_url = self._get_proxy_url()
             if proxy_url:
-                print("proxy_url: {}".format(proxy_url))
+                debug_log(self.TAG, "proxy_url: {}".format(proxy_url))
                 # record the proxy url and auth token
                 self._write_proxy_info(proxy_url, token)
                 break
         if not proxy_url:
-            print("Could not obtain the proxy server's URL. Cluster launch unsuccessful")
+            error_log(self.TAG, "Could not obtain the proxy server's URL. Cluster launch unsuccessful")
             return False
 
     def _start_registry_server(self):
@@ -349,27 +355,27 @@ class KubernetesManager(ClusterManager):
         self._launch_registry_server()
         num_retries = 5
         for i in range(num_retries):
-            print("Sleeping for 20s before getting registry URL")
+            debug_log(self.TAG, "Sleeping for 20s before getting registry URL")
             time.sleep(20)
             registry_url = self._get_registry_url()
             if registry_url:
-                print("registry_url: {}".format(registry_url))
+                debug_log(self.TAG, "registry_url: {}".format(registry_url))
                 # record the registry url 
                 self._write_registry_url(registry_url)
                 break
         if not registry_url:
-            print("Could not obtain the registry server's URL. Cluster launch unsuccessful")
+            error_log(self.TAG, "Could not obtain the registry server's URL. Cluster launch unsuccessful")
             return False
 
     def _preload_registry_server(self):
         try:
-            subprocess.check_call(["docker", "pull", "{}/binder-base".format(DOCKER_HUB_USER)])
-            subprocess.check_call(["docker", "tag", "{}/binder-base".format(DOCKER_HUB_USER),
-                "{}/binder-base".format(REGISTRY_NAME)])
-            subprocess.check_call(["docker", "push", "{}/binder-base".format(REGISTRY_NAME)])
+            subprocess.check_call(["docker", "pull", "{}/binder-base".format(MainSettings.DOCKER_HUB_USER)])
+            subprocess.check_call(["docker", "tag", "{}/binder-base".format(MainSettings.DOCKER_HUB_USER),
+                "{}/binder-base".format(MainSettings.REGISTRY_NAME)])
+            subprocess.check_call(["docker", "push", "{}/binder-base".format(MainSettings.REGISTRY_NAME)])
             return True
         except subprocess.CalledProcessError as e:
-            print("Could not preload registry server with binder-base image: {}".format(e))
+            error_log(self.TAG, "Could not preload registry server with binder-base image: {}".format(e))
             return False
 
     def start(self, num_minions=3, provider="gce"):
@@ -381,25 +387,25 @@ class KubernetesManager(ClusterManager):
             subprocess.check_call(['kube-up.sh'])
 
             # generate an auth token and launch the proxy server
-            print("Launching proxy server...")
+            info_log(self.TAG, "Launching proxy server...")
             self._start_proxy_server()
 
             # launch the private Docker registry
-            print("Launching private Docker registry...")
+            info_log(self.TAG, "Launching private Docker registry...")
             self._start_registry_server()
-            print("Preloading registry server with binder-base image...")
+            info_log(self.TAG, "Preloading registry server with binder-base image...")
             self._preload_registry_server()
 
             # preload the generic base image onto all the workers
-            print("Preloading binder-base image onto all nodes...")
+            info_log(self.TAG, "Preloading binder-base image onto all nodes...")
             success = success and self.preload_image("binder-base")
 
             # start the inactive app removal cron job
             cron = CronTab()
-            cmd = " ".join([get_env_string(), os.path.join(ROOT, "util", "stop-inactive-apps"),
+            cmd = " ".join([get_env_string(), os.path.join(MainSettings.ROOT, "util", "stop-inactive-apps"),
                             "&>/tmp/binder-cron"])
             job = cron.new(cmd, comment="binder-stop")
-            job.minute.every(APP_CRON_PERIOD)
+            job.minute.every(MonitoringSettings.APP_CRON_PERIOD)
             job.enable(True)
             cron.write_to_user(user=True)
 
@@ -407,9 +413,9 @@ class KubernetesManager(ClusterManager):
             success = False
 
         if success:
-            print("Started Kubernetes cluster successfully")
+            info_log(self.TAG, "Started Kubernetes cluster successfully")
         else:
-            print("Could not launch the Kubernetes cluster")
+            error_log(self.TAG, "Could not launch the Kubernetes cluster")
         return success
 
     def stop(self, provider="gce"):
@@ -426,7 +432,7 @@ class KubernetesManager(ClusterManager):
             cron.write_to_user(user=True)
 
         except subprocess.CalledProcessError as e:
-            print("Could not destroy the Kubernetes cluster")
+            error_log(self.TAG, "Could not destroy the Kubernetes cluster")
 
     def destroy_app(self, app_id):
         pass
@@ -446,7 +452,7 @@ class KubernetesManager(ClusterManager):
                 path = os.path.join(app_dir, f)
                 success = success and self._create(path, namespace=app_id)
                 if not success:
-                    print("Could not deploy {0} on Kubernetes cluster".format(path))
+                    error_log(self.TAG, "Could not deploy {0} on Kubernetes cluster".format(path))
 
         # create a route in the proxy
         success = success and self._register_proxy_route(app_id)
@@ -455,7 +461,7 @@ class KubernetesManager(ClusterManager):
 
         lookup_url = self._get_lookup_url()
         app_url = urljoin("http://" + lookup_url, app_id)
-        print("Access app at: \n   {}".format(app_url))
+        info_log(self.TAG, "Access app at: \n   {}".format(app_url))
         return app_url
 
     def stop_app(self, app_id):
@@ -468,13 +474,13 @@ class KubernetesManager(ClusterManager):
             subprocess.check_call(stop_cmd)
             subprocess.check_call(cleanup_cmd)
             self._remove_proxy_route(app_id)
-            print("Stopped app {}".format(app_id))
+            info_log(self.TAG, "Stopped app {}".format(app_id))
         except subprocess.CalledProcessError as e:
-            print("Could not stop app {}".format(app_id))
+            error_log(self.TAG, "Could not stop app {}".format(app_id))
 
     def _stop_apps(self, app_ids):
         if not app_ids:
-            print("No apps to stop")
+            info_log(self.TAG, "No apps to stop")
             return
         for app_id in app_ids:
             self.stop_app(app_id)
