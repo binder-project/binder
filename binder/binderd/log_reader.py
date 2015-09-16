@@ -36,7 +36,6 @@ class LogReader(BinderDModule):
         if not app:
             return self._error_msg("can only get app logs")
         try:
-            debug_log("LogReader", "since: {}".format(since))
             if since:
                 since = self._parse_time(msg.get("since"))
             logs = self._get_logs(app, since)

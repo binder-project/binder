@@ -3,7 +3,7 @@ import json
 import signal
 import time
 import datetime
-from threading import Thread
+import threading
 
 from tornado import gen
 from tornado.ioloop import IOLoop
@@ -160,18 +160,14 @@ class BuildLogsHandler(WebSocketHandler):
 
     def stop(self):
         if self._thread:
-            print "Removing websocket handler"
             self._thread.stop()
             ws_handlers.remove(self)
 
     def check_origin(self, origin):
         return True
 
-    def write_message(self, msg):
-        print "In BuildLogsHandler.write_message..."
-        super(BuildLogsHandler, self).write_message(msg)
-
     def open(self, organization, repo):
+        super(BuildLogsHandler, self).open()
         print("Opening websocket for {}/{}".format(organization, repo))
         app_name = App.make_app_name(organization, repo)
         app = App.get_app(app_name)
@@ -181,12 +177,15 @@ class BuildLogsHandler(WebSocketHandler):
 
         self._thread = AppLogStreamer(app_name, time_string, self.write_message)
         self._thread.start()
-        
+
     def on_message(self, message):
         pass
 
     def on_close(self):
+        super(BuildLogsHandler, self).on_close()
         self.stop()
+        self._thread.join()
+
 
 def sig_handler(sig, frame):
     IOLoop.instance().add_callback(shutdown)

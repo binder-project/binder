@@ -37,6 +37,7 @@ class LogWriter(BinderDModule):
 
         def __init__(self):
             super(LogWriter.PublisherThread, self).__init__()
+            self.daemon = True
             self._stopped = False
             self._queue = Queue.Queue()
 
@@ -54,11 +55,8 @@ class LogWriter(BinderDModule):
     
         def run(self):
             while not self._stopped:
-                try:
-                    topic, msg = self._queue.get_nowait()
-                    self._pub_sock.send_multipart([bytes(topic), bytes(msg)]) 
-                except Queue.Empty:
-                    continue
+                topic, msg = self._queue.get()
+                self._pub_sock.send_multipart([bytes(topic), bytes(msg)]) 
                 
     class PublisherHandler(Handler):
 

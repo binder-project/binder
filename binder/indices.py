@@ -130,10 +130,10 @@ class MongoAppIndex(FileAppIndex):
         self._apps = self._app_db.apps
 
     def update_build_state(self, app, state):
-        super(FileAppIndex, self).update_build_state(app, state)
+        super(MongoAppIndex, self).update_build_state(app, state)
 
     def get_build_state(self, app):
-        super(FileAppIndex, self).get_build_state(app)
+        return super(MongoAppIndex, self).get_build_state(app)
 
     def update_last_build_time(self, app, time=None):
         if not time:

@@ -120,6 +120,7 @@ class PubSubStreamer(Thread):
         super(PubSubStreamer, self).__init__()
         self._stopped = False
         self._queue = Queue.Queue()
+        print "Launching SubStreamReader"
         self._sub_reader = PubSubStreamer.SubStreamReader(self._queue)
         self.callbacks = {}
 
@@ -160,6 +161,7 @@ class AppLogStreamer(Thread):
 
     def __init__(self, app, start_time, callback):
         super(AppLogStreamer, self).__init__()
+        self.daemon = True
         self._stopped = False
         self._app = app
         self._start_time = start_time
@@ -169,7 +171,7 @@ class AppLogStreamer(Thread):
 
     def stop(self): 
         self._stopped = True
-        if self._cb:
+        if self._pubsub_cb:
             PubSubStreamer.get_instance().remove_app_callback(self._app, self._pubsub_cb)
 
     def run(self):
@@ -179,6 +181,7 @@ class AppLogStreamer(Thread):
         self._pubsub_cb = buffered_cb 
         PubSubStreamer.get_instance().add_app_callback(self._app, self._pubsub_cb)
             
+        lines = []
         bc = BinderClient("log_reader")
         rsp = bc.send({"type": "get", "app": self._app, "since": self._start_time})
         if rsp["type"] == "success":
@@ -186,20 +189,23 @@ class AppLogStreamer(Thread):
         else:
             error_log("LoggerClient", "read_stream failure for app {}: {}".format(self._app, rsp))
             return
+        bc.close()
 
         # exhaust all lines from the get request
         last_time = None
         for line in lines:
             last_time = LogSettings.EXTRACT_TIME(line)
             self._cb(line)
-        last_time = time.strptime(last_time, LogSettings.TIME_FORMAT)
+        if last_time:
+            last_time = time.strptime(last_time, LogSettings.TIME_FORMAT)
         
         # now start reading the subscriber output (starting strictly after last_time)
         while not self._stopped:
             try: 
-                line = buf.get_nowait()
+                timeout = 0.05
+                line = buf.get(timeout=timeout)
                 line_time = time.strptime(LogSettings.EXTRACT_TIME(line), LogSettings.TIME_FORMAT)
-                if line_time > last_time:
+                if not last_time or line_time > last_time:
                     self._cb(line)
             except Queue.Empty:
                 continue
