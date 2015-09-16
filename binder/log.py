@@ -120,7 +120,6 @@ class PubSubStreamer(Thread):
         super(PubSubStreamer, self).__init__()
         self._stopped = False
         self._queue = Queue.Queue()
-        print "Launching SubStreamReader"
         self._sub_reader = PubSubStreamer.SubStreamReader(self._queue)
         self.callbacks = {}
 

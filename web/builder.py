@@ -28,10 +28,7 @@ class NoDaemonPool(pool.Pool):
 
 def build_app(spec, log_dir, preload=False):
     name = spec["name"]
-    sys.stdout = open(os.path.join(log_dir, name + "-" + str(os.getpid()) + ".out"), "w", buffering=0)
-    sys.stderr = open(os.path.join(log_dir, name + "-" + str(os.getpid()) + ".err"), "w", buffering=0)
     app = App.get_app(name)
-    print("In build_app")
     if app and app.build_state == App.BuildState.BUILDING:
         print("App {} already building. Wait for build to complete before resubmitting.".format(name))
         return
