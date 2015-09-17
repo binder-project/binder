@@ -209,7 +209,7 @@ class App(object):
         # build the app image
         try:
             image_name = self._get_image_name().lower()
-            subprocess.check_call(['docker', 'build', '-t', image_name, app_img_path])
+            subprocess.check_call(["docker", "build", "-t", image_name, "--no-cache",  app_img_path])
         except subprocess.CalledProcessError as e:
             raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
 
