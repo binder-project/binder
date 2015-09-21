@@ -118,21 +118,21 @@ class LogWriter(BinderDModule):
         logger.addHandler(sh)
         logger.addHandler(ph)
     
-    def _make_app_logger(self, app):
-        logger = logging.getLogger(app)
-        self._set_logging_config(LogSettings.APPS_DIRECTORY, app, logger)
+    def _make_app_logger(self, name):
+        logger = logging.getLogger(name)
+        self._set_logging_config(LogSettings.APPS_DIRECTORY, name, logger)
+        self._app_loggers[name] = logger
         return logger
 
     def _configure_app_loggers(self):
         make_dir(LogSettings.APPS_DIRECTORY)
         apps = App.get_app()
         for app in apps:
-            if not app in self._app_loggers:
-                logger = self._make_app_logger(app.name)
-                self._app_loggers[app.name] = logger 
+            if not app.name in self._app_loggers:
+                self._make_app_logger(app.name)
 
-    def _get_logger(self, app):
-        return self._app_loggers.get(app)
+    def _get_logger(self, name):
+        return self._app_loggers.get(name)
 
     def _initialize(self):
         super(LogWriter, self)._initialize()

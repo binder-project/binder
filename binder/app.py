@@ -187,7 +187,7 @@ class App(object):
             for dependency in self.dependencies:
                 # TODO do more modular dependency handling here
                 if dependency == "requirements.txt":
-                    shutil.copy(os.path.join(ROOT, "util", "handle-requirements.py"), os.path.join(app_img_path, "handle-requirements.py"))
+                    shutil.copy(os.path.join(MainSettings.ROOT, "util", "handle-requirements.py"), os.path.join(app_img_path, "handle-requirements.py"))
                     app.write("ADD {} requirements.txt\n".format("repo/requirements.txt"))
                     app.write("ADD handle-requirements.py handle-requirements.py\n")
                     app.write("RUN python handle-requirements.py\n")

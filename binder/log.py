@@ -187,7 +187,6 @@ class AppLogStreamer(Thread):
             lines = rsp["msg"].split("\n")
         else:
             error_log("LoggerClient", "read_stream failure for app {}: {}".format(self._app, rsp))
-            return
         bc.close()
 
         # exhaust all lines from the get request

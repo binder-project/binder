@@ -385,6 +385,11 @@ class KubernetesManager(ClusterManager):
             os.environ["NUM_MINIONS"] = str(num_minions)
             os.environ["KUBERNETES_PROVIDER"] = provider
             subprocess.check_call(['kube-up.sh'])
+        
+            # launch binderd
+            binderd_proc = subprocess.Popen(["binderd"])
+            # sleep just for good measure (modules starting up)
+            time.sleep(5)
 
             # generate an auth token and launch the proxy server
             info_log(self.TAG, "Launching proxy server...")

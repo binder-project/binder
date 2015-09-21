@@ -161,6 +161,7 @@ class BuildLogsHandler(WebSocketHandler):
     def stop(self):
         if self._thread:
             self._thread.stop()
+            self._thread.join()
             ws_handlers.remove(self)
 
     def check_origin(self, origin):
@@ -184,7 +185,6 @@ class BuildLogsHandler(WebSocketHandler):
     def on_close(self):
         super(BuildLogsHandler, self).on_close()
         self.stop()
-        self._thread.join()
 
 
 def sig_handler(sig, frame):
