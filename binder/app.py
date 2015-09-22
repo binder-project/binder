@@ -369,10 +369,10 @@ class App(object):
         if success:
             app_id = app_params["app.id"]
             msg = "Successfully deployed app {0} in {1} mode with ID {2}".format(self.name, mode, app_id)
-            info_log(self.TAG, msg, app=self.name)
+            info_log(self.TAG, msg)
             return redirect_url
         else:
-            error_log(self.TAG, "Failed to deploy app {0} in {1} mode.".format(self.name, mode), app=self.name)
+            error_log(self.TAG, "Failed to deploy app {0} in {1} mode.".format(self.name, mode))
             return None
 
     def destroy(self):

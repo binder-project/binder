@@ -88,6 +88,17 @@ def write_stream(tag, level_string, stream, app=None):
     t = Thread(target=_process_stream, args=(app, stream))
     t.start()
 
+def get_app_logs(app, start_time):
+    lines = []
+    bc = BinderClient("log_reader")
+    rsp = bc.send({"type": "get", "app": app, "since": start_time})
+    if rsp["type"] == "success":
+        lines = rsp["msg"].split("\n")
+    else:
+        error_log("LoggerClient", "read_stream failure for app {}: {}".format(app, rsp))
+    bc.close()
+    return lines
+
 
 class PubSubStreamer(Thread):
 
@@ -180,14 +191,7 @@ class AppLogStreamer(Thread):
         self._pubsub_cb = buffered_cb 
         PubSubStreamer.get_instance().add_app_callback(self._app, self._pubsub_cb)
             
-        lines = []
-        bc = BinderClient("log_reader")
-        rsp = bc.send({"type": "get", "app": self._app, "since": self._start_time})
-        if rsp["type"] == "success":
-            lines = rsp["msg"].split("\n")
-        else:
-            error_log("LoggerClient", "read_stream failure for app {}: {}".format(self._app, rsp))
-        bc.close()
+        lines = get_app_logs(self._app, self._start_time)
 
         # exhaust all lines from the get request
         last_time = None

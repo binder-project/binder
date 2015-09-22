@@ -14,7 +14,7 @@ from tornado.websocket import WebSocketHandler
 from binder.service import Service
 from binder.app import App
 from binder.cluster import ClusterManager
-from binder.log import AppLogStreamer 
+from binder.log import AppLogStreamer, get_app_logs 
 from binder.settings import LogSettings
 
 from .builder import Builder
@@ -151,11 +151,20 @@ class CapacityHandler(BinderHandler):
             CapacityHandler.last_poll = time.time()
         self.write({"capacity": self.cached_capacity, "running": running})
 
+class StaticLogsHandler(BinderHandler):
 
-class BuildLogsHandler(WebSocketHandler):
+    def get(self, organization, repo):
+        super(StaticLogsHandler, self).get()
+        app_name = App.make_app_name(organization, repo)
+        app = App.get_app(app_name)
+        time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
+        self.write({"logs": get_app_logs(app_name, time_string)})
+        
+
+class LiveLogsHandler(WebSocketHandler):
 
     def __init__(self, application, request, **kwargs):
-        super(BuildLogsHandler, self).__init__(application, request, **kwargs)
+        super(LiveLogsHandler, self).__init__(application, request, **kwargs)
         self._thread = None
 
     def stop(self):
@@ -168,7 +177,7 @@ class BuildLogsHandler(WebSocketHandler):
         return True
 
     def open(self, organization, repo):
-        super(BuildLogsHandler, self).open()
+        super(LiveLogsHandler, self).open()
         print("Opening websocket for {}/{}".format(organization, repo))
         app_name = App.make_app_name(organization, repo)
         app = App.get_app(app_name)
@@ -183,7 +192,7 @@ class BuildLogsHandler(WebSocketHandler):
         pass
 
     def on_close(self):
-        super(BuildLogsHandler, self).on_close()
+        super(LiveLogsHandler, self).on_close()
         self.stop()
 
 
@@ -201,7 +210,8 @@ def main():
 
     application = Application([
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)/status", GithubStatusHandler),
-        (r"/apps/(?P<organization>.+)/(?P<repo>.+)/logs", BuildLogsHandler),
+        (r"/apps/(?P<organization>.+)/(?P<repo>.+)/logs/static", StaticLogsHandler),
+        (r"/apps/(?P<organization>.+)/(?P<repo>.+)/logs/live", LiveLogsHandler),
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubBuildHandler),
         (r"/apps/(?P<app_id>.+)", OtherSourceHandler),
         (r"/services", ServicesHandler),

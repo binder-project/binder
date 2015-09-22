@@ -462,6 +462,7 @@ class KubernetesManager(ClusterManager):
         # create a route in the proxy
         success = success and self._register_proxy_route(app_id)
         if not success:
+            error_log(self.TAG, "Could not deploy {} on Kubernetes cluster".format(path))
             return None
 
         lookup_url = self._get_lookup_url()
