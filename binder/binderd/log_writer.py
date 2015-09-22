@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import Queue
+import re
 
 from logging import Handler, FileHandler, StreamHandler, Formatter
 from threading import Thread
@@ -23,6 +24,8 @@ class LogWriter(BinderDModule):
 
     ROOT_FORMAT = "%(asctime)s %(levelname)s: - %(message)s"
     BINDER_FORMAT = "%(asctime)s %(levelname)s: - %(tag)s: %(message)s"
+
+    COLOR_RE = re.compile(r'\[\d+m')
 
     class PublisherThread(Thread):
 
@@ -162,6 +165,10 @@ class LogWriter(BinderDModule):
             else:
                 logger = self._root_logger
             if level and string:
+                m = LogWriter.COLOR_RE.search(string)
+                if m:
+                    start, stop = m.span()
+                    string = string[:start] + string[stop:]
                 if level == logging.DEBUG:
                     result_msg = "message logged as debug"
                     logger.debug(string, extra=extra)  

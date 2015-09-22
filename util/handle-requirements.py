@@ -8,9 +8,11 @@ if __name__ == "__main__":
     for cmd in commands:
         try:
             print("Executing: {}".format(cmd))
+            sys.stdout.flush()
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError as e:
             print("installation command failed: {}".format(e))
+            sys.stdout.flush()
             errors += 1
             continue
     if errors >= len(commands): 
