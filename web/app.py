@@ -6,7 +6,7 @@ import datetime
 import threading
 
 from tornado import gen
-from tornado.ioloop import IOLoop
+from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.web import Application, RequestHandler
 from tornado.httpserver import HTTPServer
 from tornado.websocket import WebSocketHandler
@@ -35,6 +35,15 @@ class BinderHandler(RequestHandler):
     def get(self):
         if ALLOW_ORIGIN:
             self.set_header('Access-Control-Allow-Origin', '*')
+
+    def _get_app(self, app_name):
+        return gen.maybe_future(App.get_app(app_name))
+
+    def _get_services(self):
+        return gen.maybe_future(Service.get_service())
+
+    def _get_apps(self):
+        return gen.maybe_future(App.get_app())
 
     def post(self):
         if ALLOW_ORIGIN:
@@ -66,10 +75,11 @@ class GithubHandler(BuildHandler):
 
 class GithubStatusHandler(GithubHandler):
 
+    @gen.coroutine
     def get(self, organization, repo):
         super(GithubStatusHandler, self).get()
         app_name = App.make_app_name(organization, repo)
-        app = App.get_app(app_name)
+        app = yield self._get_app(app_name)
         if not app:
             self.set_status(404)
             self.write({"error": "app does not exist"})
@@ -85,7 +95,7 @@ class GithubBuildHandler(GithubHandler):
         # the redirect url
         super(GithubHandler, self).get()
         app_name = App.make_app_name(organization, repo)
-        app = App.get_app(app_name)
+        app = yield self._get_app(app_name)
         if app and app.build_state == App.BuildState.COMPLETED:
             redirect_url = app.deploy("single-node")
             self.write({"redirect_url": redirect_url})
@@ -122,14 +132,14 @@ class ServicesHandler(BinderHandler):
 
     def get(self):
         super(ServicesHandler, self).get()
-        services = Service.get_service()
+        services = yield self._get_services()
         self.write({"services": [service.full_name for service in services]})
 
 class AppsHandler(BinderHandler):
 
     def get(self):
         super(AppsHandler, self).get()
-        apps = App.get_app()
+        apps = yield self._get_apps()
         self.write({"apps": [app.name for app in apps]})
 
 class CapacityHandler(BinderHandler):
@@ -138,7 +148,11 @@ class CapacityHandler(BinderHandler):
 
     cached_capacity = None
     last_poll = None
+
+    def _get_capacity(self, cm):
+        return gen.maybe_future(cm.get_total_capacity())
     
+    @gen.coroutine
     def get(self):
         super(CapacityHandler, self).get()
         cm = ClusterManager.get_instance()
@@ -146,7 +160,7 @@ class CapacityHandler(BinderHandler):
         running = len(cm.get_running_apps()) - 3
         if not self.last_poll or not self.cached_capacity or\
                 time.time() - self.last_poll > CapacityHandler.POLL_PERIOD:
-            capacity = cm.get_total_capacity()
+            capacity = yield self._get_capacity(cm)
             CapacityHandler.cached_capacity = capacity
             CapacityHandler.last_poll = time.time()
         self.write({"capacity": self.cached_capacity, "running": running})
@@ -156,7 +170,7 @@ class StaticLogsHandler(BinderHandler):
     def get(self, organization, repo):
         super(StaticLogsHandler, self).get()
         app_name = App.make_app_name(organization, repo)
-        app = App.get_app(app_name)
+        app = yield self._get_app(app_name)
         time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
         self.write({"logs": get_app_logs(app_name, time_string)})
         
@@ -165,16 +179,31 @@ class LiveLogsHandler(WebSocketHandler):
 
     def __init__(self, application, request, **kwargs):
         super(LiveLogsHandler, self).__init__(application, request, **kwargs)
-        self._thread = None
+        self._stream = None
+        self._streamer = None
+        self._periodic_cb = None
 
     def stop(self):
-        if self._thread:
-            self._thread.stop()
-            self._thread.join()
+        if self._periodic_cb:
+            self._streamer.stop()
+            self._periodic_cb.stop()
+            self._periodic_cb = None
+            self._streamer = None
+            self._stream = None
             ws_handlers.remove(self)
 
     def check_origin(self, origin):
         return True
+
+    def _write_stream(self):
+        if self._stream:
+            try: 
+                msg = self._stream.next()
+                if not msg:
+                    return
+                self.write_message(msg)
+            except StopIteration:
+                self.stop()
 
     def open(self, organization, repo):
         super(LiveLogsHandler, self).open()
@@ -185,8 +214,10 @@ class LiveLogsHandler(WebSocketHandler):
 
         ws_handlers.append(self)
 
-        self._thread = AppLogStreamer(app_name, time_string, self.write_message)
-        self._thread.start()
+        self._streamer = AppLogStreamer(app_name, time_string)
+        self._stream = self._streamer.get_stream()
+        self._periodic_cb = PeriodicCallback(self._write_stream, 50)
+        self._periodic_cb.start()
 
     def on_message(self, message):
         pass

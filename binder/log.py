@@ -5,6 +5,7 @@ import time
 from threading import Thread, current_thread, Lock
 
 import zmq
+from tornado import gen
 
 from binder.binderd.client import BinderClient
 from binder.settings import LogSettings
@@ -167,15 +168,14 @@ class PubSubStreamer(Thread):
                     cb(msg)
 
 
-class AppLogStreamer(Thread):
+class AppLogStreamer(object):
 
-    def __init__(self, app, start_time, callback):
+    def __init__(self, app, start_time):
         super(AppLogStreamer, self).__init__()
         self.daemon = True
         self._stopped = False
         self._app = app
         self._start_time = start_time
-        self._cb = callback
         self._pubsub_cb = None
         PubSubStreamer.get_instance()
 
@@ -184,11 +184,11 @@ class AppLogStreamer(Thread):
         if self._pubsub_cb:
             PubSubStreamer.get_instance().remove_app_callback(self._app, self._pubsub_cb)
 
-    def run(self):
+    def get_stream(self):
         buf = Queue.Queue()
-        def buffered_cb(msg):
+        def _insert_msg(msg):
             buf.put(msg)
-        self._pubsub_cb = buffered_cb 
+        self._pubsub_cb = _insert_msg
         PubSubStreamer.get_instance().add_app_callback(self._app, self._pubsub_cb)
             
         lines = get_app_logs(self._app, self._start_time)
@@ -197,7 +197,7 @@ class AppLogStreamer(Thread):
         last_time = None
         for line in lines:
             last_time = LogSettings.EXTRACT_TIME(line)
-            self._cb(line)
+            yield line
         if last_time:
             last_time = time.strptime(last_time, LogSettings.TIME_FORMAT)
         
@@ -205,10 +205,12 @@ class AppLogStreamer(Thread):
         while not self._stopped:
             try: 
                 timeout = 0.05
-                line = buf.get(timeout=timeout)
+                line = buf.get_nowait()
                 line_time = time.strptime(LogSettings.EXTRACT_TIME(line), LogSettings.TIME_FORMAT)
                 if not last_time or line_time > last_time:
-                    self._cb(line)
+                    yield line
+                gen.sleep(timeout)
             except Queue.Empty:
-                continue
+                yield None
+        raise StopIteration()
 
