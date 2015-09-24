@@ -226,7 +226,6 @@ class LiveLogsHandler(WebSocketHandler):
         super(LiveLogsHandler, self).on_close()
         self.stop()
 
-
 def sig_handler(sig, frame):
     IOLoop.instance().add_callback(shutdown)
 
@@ -248,17 +247,18 @@ def main():
         (r"/services", ServicesHandler),
         (r"/apps", AppsHandler),
         (r"/capacity", CapacityHandler)
-    ], debug=True)
-
-    signal.signal(signal.SIGTERM, sig_handler)
-    signal.signal(signal.SIGINT, sig_handler)
+    ], debug=False)
 
     global builder
     builder = Builder(build_queue, PRELOAD)
     builder.start()
 
     http_server = HTTPServer(application)
-    http_server.listen(PORT)
+    http_server.bind(PORT)
+    http_server.start(0)
+
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
 
     print("Binder API server running on port {}".format(PORT))
     IOLoop.current().start()
