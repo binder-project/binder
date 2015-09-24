@@ -9,6 +9,7 @@ import pymongo
 
 from binder.utils import make_dir
 from binder.settings import LogSettings
+from binder.log import error_log
 
 
 class AppIndex(object):

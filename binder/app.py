@@ -164,7 +164,7 @@ class App(object):
         # build the app image
         try:
             image_name = self._get_image_name().lower()
-            cmd = ['docker', 'build', '-t', image_name, os.path.join(app_img_path, "repo")]
+            cmd = ['docker', 'build', '-t', image_name, "--no-cache", os.path.join(app_img_path, "repo")]
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             write_stream(self.TAG, "info", proc.stdout, app=self.name)
             write_stream(self.TAG, "error", proc.stderr, app=self.name)

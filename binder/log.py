@@ -197,7 +197,10 @@ class AppLogStreamer(Thread):
         last_time = None
         for line in lines:
             last_time = LogSettings.EXTRACT_TIME(line)
-            self._cb(line)
+            try: 
+                self._cb(line)
+            except Exception:
+                continue
         if last_time:
             last_time = time.strptime(last_time, LogSettings.TIME_FORMAT)
         
