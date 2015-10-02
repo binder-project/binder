@@ -34,8 +34,6 @@ USER root
 RUN chmod a+rX /srv/templates
 RUN chown -R main:main /home/main
 
-RUN pip install --upgrade setuptools pip
-
 USER main
 
 # Install Anaconda and Jupyter
@@ -45,5 +43,7 @@ RUN bash Anaconda-2.3.0-Linux-x86_64.sh -b &&\
 ENV PATH $HOME/anaconda/bin:$PATH
 RUN conda create -n python3 python=3.3 anaconda
 RUN /bin/bash -c "source activate python3 && ipython kernelspec install-self --user"
+
+RUN /home/main/anaconda/bin/pip install --upgrade setuptools pip
 
 ENV SHELL /bin/bash
