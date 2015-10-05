@@ -183,9 +183,11 @@ class LiveLogsHandler(WebSocketHandler):
 
     class LogsThread(Thread):
         
-        def __init__(self, handler, stream):
+        def __init__(self, app_name, handler):
             super(LiveLogsHandler.LogsThread, self).__init__()
-            self._stream = stream
+            self._app_name = app_name
+           
+            self._stream = None
             self._handler = handler
             self._stopped = False
 
@@ -193,6 +195,9 @@ class LiveLogsHandler(WebSocketHandler):
             self._stopped = True
 
         def run(self):
+            app = App.get_app(self._app_name)
+            time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
+            self._stream = AppLogStreamer(self._app_name, time_string).get_stream()
             while not self._stopped:
                 try: 
                     msg = self._stream.next()
@@ -203,9 +208,7 @@ class LiveLogsHandler(WebSocketHandler):
                 
     def __init__(self, application, request, **kwargs):
         super(LiveLogsHandler, self).__init__(application, request, **kwargs)
-        self._stream = None
-        self._streamer = None
-        self._periodic_cb = None
+        self._thread = None
 
     def stop(self):
         if self._thread:
@@ -215,28 +218,14 @@ class LiveLogsHandler(WebSocketHandler):
     def check_origin(self, origin):
         return True
 
-    def _write_stream(self):
-        if self._stream:
-            try: 
-                msg = self._stream.next()
-                if not msg:
-                    return
-                self.write_message(msg)
-            except StopIteration:
-                self.stop()
-
     def open(self, organization, repo):
         super(LiveLogsHandler, self).open()
         print("Opening websocket for {}/{}".format(organization, repo))
         app_name = App.make_app_name(organization, repo)
-        app = App.get_app(app_name)
-        time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
 
         ws_handlers.append(self)
 
-        self._streamer = AppLogStreamer(app_name, time_string)
-        self._stream = self._streamer.get_stream()
-        self._thread = LiveLogsHandler.LogsThread(self, self._stream)
+        self._thread = LiveLogsHandler.LogsThread(app_name, self)
         self._thread.start()
 
     def on_message(self, message):
