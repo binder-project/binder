@@ -18,7 +18,7 @@
             "value": "{{token}}"
           }
         ],
-        "command": ["configurable-http-proxy", "--port", "8080",
+        "command": ["configurable-http-proxy", "--port", "8080", "--error-path", "/home/main/error_pages",
           "--api-port", "8081", "--api-ip", "0.0.0.0", "--log-level", "debug"],
         "ports": [
           {

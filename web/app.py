@@ -4,6 +4,7 @@ import signal
 import time
 import datetime
 import threading
+from threading import Thread
 
 from tornado import gen
 from tornado.ioloop import IOLoop, PeriodicCallback
@@ -177,33 +178,37 @@ class StaticLogsHandler(BinderHandler):
 
 class LiveLogsHandler(WebSocketHandler):
 
+    class LogsThread(Thread):
+        
+        def __init__(self, handler, stream):
+            super(LiveLogsHandler.LogsThread, self).__init__()
+            self._stream = stream
+            self._handler = handler
+            self._stopped = False
+
+        def stop(self):
+            self._stopped = True
+
+        def run(self):
+            while not self._stopped:
+                try: 
+                    msg = self._stream.next()
+                    if msg:
+                        self._handler.write_message(msg)
+                except StopIteration:
+                    self.stop()
+                
     def __init__(self, application, request, **kwargs):
         super(LiveLogsHandler, self).__init__(application, request, **kwargs)
-        self._stream = None
-        self._streamer = None
-        self._periodic_cb = None
+        self._thread = None
 
     def stop(self):
-        if self._periodic_cb:
-            self._streamer.stop()
-            self._periodic_cb.stop()
-            self._periodic_cb = None
-            self._streamer = None
-            self._stream = None
+        if self._thread:
+            self._thread.stop()
             ws_handlers.remove(self)
 
     def check_origin(self, origin):
         return True
-
-    def _write_stream(self):
-        if self._stream:
-            try: 
-                msg = self._stream.next()
-                if not msg:
-                    return
-                self.write_message(msg)
-            except StopIteration:
-                self.stop()
 
     def open(self, organization, repo):
         super(LiveLogsHandler, self).open()
@@ -216,8 +221,8 @@ class LiveLogsHandler(WebSocketHandler):
 
         self._streamer = AppLogStreamer(app_name, time_string)
         self._stream = self._streamer.get_stream()
-        self._periodic_cb = PeriodicCallback(self._write_stream, 50)
-        self._periodic_cb.start()
+        self._thread = LiveLogsHandler.LogsThread(self, self._stream)
+        self._thread.start()
 
     def on_message(self, message):
         pass
@@ -254,8 +259,7 @@ def main():
     builder.start()
 
     http_server = HTTPServer(application)
-    http_server.bind(PORT)
-    http_server.start(0)
+    http_server.listen(PORT)
 
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)

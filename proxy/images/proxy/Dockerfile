@@ -17,7 +17,11 @@ EXPOSE 8080
 EXPOSE 8081
 
 USER main
+
 ENV HOME /home/main
 ENV SHELL /bin/bash
 ENV USER main
+
+ADD error_pages/ $HOME/error_pages
+
 WORKDIR $HOME
