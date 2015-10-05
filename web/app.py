@@ -131,6 +131,7 @@ class OtherSourceHandler(BuildHandler):
 
 class ServicesHandler(BinderHandler):
 
+    @gen.coroutine
     def get(self):
         super(ServicesHandler, self).get()
         services = yield self._get_services()
@@ -138,6 +139,7 @@ class ServicesHandler(BinderHandler):
 
 class AppsHandler(BinderHandler):
 
+    @gen.coroutine
     def get(self):
         super(AppsHandler, self).get()
         apps = yield self._get_apps()
@@ -168,6 +170,7 @@ class CapacityHandler(BinderHandler):
 
 class StaticLogsHandler(BinderHandler):
 
+    @gen.coroutine
     def get(self, organization, repo):
         super(StaticLogsHandler, self).get()
         app_name = App.make_app_name(organization, repo)
@@ -200,7 +203,9 @@ class LiveLogsHandler(WebSocketHandler):
                 
     def __init__(self, application, request, **kwargs):
         super(LiveLogsHandler, self).__init__(application, request, **kwargs)
-        self._thread = None
+        self._stream = None
+        self._streamer = None
+        self._periodic_cb = None
 
     def stop(self):
         if self._thread:
@@ -209,6 +214,16 @@ class LiveLogsHandler(WebSocketHandler):
 
     def check_origin(self, origin):
         return True
+
+    def _write_stream(self):
+        if self._stream:
+            try: 
+                msg = self._stream.next()
+                if not msg:
+                    return
+                self.write_message(msg)
+            except StopIteration:
+                self.stop()
 
     def open(self, organization, repo):
         super(LiveLogsHandler, self).open()
