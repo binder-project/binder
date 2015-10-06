@@ -3,3 +3,4 @@ python-crontab
 tornado
 multiprocess
 pymongo
+futures

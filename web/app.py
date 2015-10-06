@@ -5,8 +5,9 @@ import time
 import datetime
 import threading
 from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
 
-from tornado import gen
+from tornado import gen, concurrent
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.web import Application, RequestHandler
 from tornado.httpserver import HTTPServer
@@ -33,18 +34,29 @@ ws_handlers = []
 
 class BinderHandler(RequestHandler):
 
+    def __init__(self, request, application, **kwargs):
+        super(BinderHandler, self).__init__(request, application, **kwargs)
+        self.executor = ThreadPoolExecutor(max_workers=10)
+
     def get(self):
         if ALLOW_ORIGIN:
             self.set_header('Access-Control-Allow-Origin', '*')
 
+    @concurrent.run_on_executor
     def _get_app(self, app_name):
-        return gen.maybe_future(App.get_app(app_name))
+        return App.get_app(app_name)
 
+    @concurrent.run_on_executor
     def _get_services(self):
-        return gen.maybe_future(Service.get_service())
+        return Service.get_service()
 
+    @concurrent.run_on_executor
     def _get_apps(self):
-        return gen.maybe_future(App.get_app())
+        return App.get_app()
+
+    @concurrent.run_on_executor
+    def _deploy_app(self, app, mode):
+        return app.deploy(mode)
 
     def post(self):
         if ALLOW_ORIGIN:
@@ -98,7 +110,7 @@ class GithubBuildHandler(GithubHandler):
         app_name = App.make_app_name(organization, repo)
         app = yield self._get_app(app_name)
         if app and app.build_state == App.BuildState.COMPLETED:
-            redirect_url = app.deploy("single-node")
+            redirect_url = yield self._deploy_app(app, "single-node")
             self.write({"redirect_url": redirect_url})
         else:
             self.set_status(404)
@@ -152,8 +164,9 @@ class CapacityHandler(BinderHandler):
     cached_capacity = None
     last_poll = None
 
+    @concurrent.run_on_executor
     def _get_capacity(self, cm):
-        return gen.maybe_future(cm.get_total_capacity())
+        return cm.get_total_capacity()
     
     @gen.coroutine
     def get(self):
@@ -170,13 +183,18 @@ class CapacityHandler(BinderHandler):
 
 class StaticLogsHandler(BinderHandler):
 
+    @concurrent.run_on_executor
+    def _get_app_logs(self, app_name, time_string):
+        return get_app_logs(app_name, time_string)
+
     @gen.coroutine
     def get(self, organization, repo):
         super(StaticLogsHandler, self).get()
         app_name = App.make_app_name(organization, repo)
         app = yield self._get_app(app_name)
         time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
-        self.write({"logs": get_app_logs(app_name, time_string)})
+        logs = yield self._get_app_logs(app_name, time_string)
+        self.write({"logs": logs})
         
 
 class LiveLogsHandler(WebSocketHandler):
@@ -191,6 +209,8 @@ class LiveLogsHandler(WebSocketHandler):
             self._handler = handler
             self._stopped = False
 
+            self._ioloop = IOLoop.instance()
+
         def stop(self):
             self._stopped = True
 
@@ -199,10 +219,11 @@ class LiveLogsHandler(WebSocketHandler):
             time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
             self._stream = AppLogStreamer(self._app_name, time_string).get_stream()
             while not self._stopped:
+                time.sleep(0.05)
                 try: 
                     msg = self._stream.next()
                     if msg:
-                        self._handler.write_message(msg)
+                        self._ioloop.add_callback(self._handler.write_message, msg)
                 except StopIteration:
                     self.stop()
                 
@@ -269,6 +290,7 @@ def main():
     signal.signal(signal.SIGINT, sig_handler)
 
     print("Binder API server running on port {}".format(PORT))
+    IOLoop.current().set_blocking_log_threshold(3)
     IOLoop.current().start()
 
 
