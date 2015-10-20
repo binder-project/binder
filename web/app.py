@@ -155,7 +155,21 @@ class AppsHandler(BinderHandler):
     def get(self):
         super(AppsHandler, self).get()
         apps = yield self._get_apps()
-        self.write({"apps": [app.name for app in apps]})
+        self.write({"apps": [{"name": app.name, "repo": app.repo_url} for app in apps]})
+
+class RunningAppsHandler(BinderHandler):
+    
+    @concurrent.run_on_executor
+    def _get_running_apps(self):
+        cm = ClusterManager.get_instance()
+        return cm.get_running_apps()
+
+    @gen.coroutine
+    def get(self):
+        super(RunningAppsHandler, self).get()
+        running_apps = yield self._get_running_apps()
+        self.write({"apps": map(lambda app: app[1], running_apps)})
+         
 
 class CapacityHandler(BinderHandler):
 
@@ -274,6 +288,7 @@ def main():
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)/logs/live", LiveLogsHandler),
         (r"/apps/(?P<organization>.+)/(?P<repo>.+)", GithubBuildHandler),
         (r"/apps/(?P<app_id>.+)", OtherSourceHandler),
+        (r"/running", RunningAppsHandler),
         (r"/services", ServicesHandler),
         (r"/apps", AppsHandler),
         (r"/capacity", CapacityHandler)

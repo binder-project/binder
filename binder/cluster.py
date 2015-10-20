@@ -130,7 +130,7 @@ class KubernetesManager(ClusterManager):
             ready = ready_re.search(output)
             if not ready:
                 warning_log(self.TAG, "Extracted the pod IP, but the notebook container is not ready")
-                return None 
+                return None
             else:
                 status = ready.group("ready").lower().strip()
                 debug_log(self.TAG, "status: {}".format(status))
@@ -259,11 +259,30 @@ class KubernetesManager(ClusterManager):
 
     def get_running_apps(self):
         try:
-            output = subprocess.check_output(['kubectl.sh', 'get', 'namespaces'])
-            return map(lambda line: line.split()[0], output.split('\n')[1:-1]) 
-        except subprocess.CalledProcessError as e:
-            error_log(self.TAG, "Couldn't get running apps: {}".format(e))
-        return None
+            proxy_loc = MainSettings.KUBE_PROXY_HOST + ':' + MainSettings.KUBE_PROXY_PORT
+            url = urljoin(proxy_loc, "/api/v1/pods")
+            r = requests.get(url)
+            if r.status_code != 200:
+                error_log(self.TAG, "could not get list of running pods")
+                return None
+            json = r.json()
+            if 'items' not in json:
+                error_log(self.TAG, "pods api endpoint returning malformed JSON")
+                return None
+            pod_specs = json['items']
+            pods = []
+            for pod_spec in pod_specs:
+                meta = pod_spec['metadata']
+                if meta['namespace'] == 'kube-system' or meta['namespace'] == 'default':
+                    continue
+                if meta['name'] == 'notebook-server':
+                    full_image = pod_spec['spec']['containers'][0]['image']
+                    image_name = full_image.split('/')[-1]
+                    pods.append((meta['namespace'], image_name))
+            return pods
+        except ConnectionError as e:
+            error_log(self.TAG, e)
+            return None
 
     def _nodes_command(self, func):
         provider = os.environ["KUBERNETES_PROVIDER"]
@@ -496,6 +515,6 @@ class KubernetesManager(ClusterManager):
         self._stop_apps(routes)
 
     def stop_all_apps(self):
-        app_ids = self.get_running_apps()
+        app_ids = map(lambda app: app[0], self.get_running_apps())
         self._stop_apps(app_ids)
 

@@ -16,6 +16,9 @@ class MainSettings(object):
     DOCKER_HUB_USER = "andrewosh"
     REGISTRY_NAME = "gcr.io/{}".format(os.environ["BINDER_PROJECT"])
 
+    KUBE_PROXY_HOST = "http://localhost"
+    KUBE_PROXY_PORT = "8083"
+
 # logging
 class LogSettings(object):
     # server settings
