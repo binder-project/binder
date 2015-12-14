@@ -18,8 +18,11 @@ class LogReader(BinderDModule):
         except Exception as e:
             return datetime.datetime.min
 
-    def _get_logs(self, app, since=None):
-        log_file = os.path.join(LogSettings.APPS_DIRECTORY, app + ".log")
+    def _get_logs(self, app, since=None, filtered=False):
+        if not filtered:
+            log_file = os.path.join(LogSettings.APPS_DIRECTORY, app + ".log")
+        else:
+            log_file = os.path.join(LogSettings.APPS_DIRECTORY, app + "-filtered.log")
         with open(log_file, 'r') as f: 
             # TODO this could be made more efficient
             if since: 
@@ -33,12 +36,15 @@ class LogReader(BinderDModule):
     def _handle_get(self, msg):
         app = msg.get("app")
         since = msg.get("since")
+        filtered = msg.get("filtered")
+        if filtered:
+            filtered = bool(filtered)
         if not app:
             return self._error_msg("can only get app logs")
         try:
             if since:
                 since = self._parse_time(msg.get("since"))
-            logs = self._get_logs(app, since)
+            logs = self._get_logs(app, since, filtered)
             return self._success_msg(logs)
         except Exception as e:
             return self._error_msg("couldn't get app logs: {}".format(e))

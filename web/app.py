@@ -198,8 +198,8 @@ class CapacityHandler(BinderHandler):
 class StaticLogsHandler(BinderHandler):
 
     @concurrent.run_on_executor
-    def _get_app_logs(self, app_name, time_string):
-        return get_app_logs(app_name, time_string)
+    def _get_app_logs(self, app_name, time_string, filtered):
+        return get_app_logs(app_name, time_string, filtered)
 
     @gen.coroutine
     def get(self, organization, repo):
@@ -207,7 +207,8 @@ class StaticLogsHandler(BinderHandler):
         app_name = App.make_app_name(organization, repo)
         app = yield self._get_app(app_name)
         time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
-        logs = yield self._get_app_logs(app_name, time_string)
+        filtered = self.get_query_argument('filtered', default='false').lower() == 'true'
+        logs = yield self._get_app_logs(app_name, time_string, filtered)
         self.write({"logs": logs})
         
 
@@ -231,7 +232,7 @@ class LiveLogsHandler(WebSocketHandler):
             time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
             self._stream = AppLogStreamer(self._app_name, time_string).get_stream()
             while not self._stopped:
-                time.sleep(0.10)
+                # time.sleep(0.10)
                 try: 
                     msg = self._stream.next()
                     if msg:

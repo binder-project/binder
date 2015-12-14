@@ -45,54 +45,56 @@ class LoggerClient(Thread):
         while not self._queue.empty():
             self._send_message()
 
-    def _send(self, msg):
-        self._queue.put(msg)
+    def _send(self, level, tag, msg, **kwargs):
+        to_send = {'type': 'log', 'level': level, 'msg': msg, 'tag': tag}
+        to_send.update(kwargs)
+        self._queue.put(to_send)
 
-    def debug(self, tag, msg, app=None):
-        self._send({'type': 'log', 'level': logging.DEBUG, 'msg': msg, 'tag': tag, 'app': app})
+    def debug(self, tag, msg, **kwargs):
+        self._send(logging.DEBUG, tag, msg, **kwargs)
 
-    def info(self, tag, msg, app=None):
-        self._send({'type': 'log', 'level': logging.INFO, 'msg': msg, 'tag': tag, 'app': app})
+    def info(self, tag, msg, **kwargs):
+        self._send(logging.INFO, tag, msg, **kwargs)
 
-    def warn(self, tag, msg, app=None):
-        self._send({'type': 'log', 'level': logging.WARNING, 'msg': msg, 'tag': tag, 'app': app})
+    def warn(self, tag, msg, **kwargs):
+        self._send(logging.WARNING, tag, msg, **kwargs)
 
-    def error(self, tag, msg, app=None):
-        self._send({'type': 'log', 'level': logging.ERROR, 'msg': msg, 'tag': tag, 'app': app})
+    def error(self, tag, msg, **kwargs):
+        self._send(logging.ERROR, tag, msg, **kwargs)
 
 
-def debug_log(tag, msg, app=None):
+def debug_log(tag, msg, **kwargs):
     log = LoggerClient.getInstance()
-    log.debug(tag, msg, app)
+    log.debug(tag, msg, **kwargs)
 
-def info_log(tag, msg, app=None):
+def info_log(tag, msg, **kwargs):
     log = LoggerClient.getInstance()
-    log.info(tag, msg, app)
+    log.info(tag, msg, **kwargs)
 
-def warning_log(tag, msg, app=None):
+def warning_log(tag, msg, **kwargs):
     log = LoggerClient.getInstance()
-    log.warn(tag, msg, app)
+    log.warn(tag, msg, **kwargs)
 
-def error_log(tag, msg, app=None):
+def error_log(tag, msg, **kwargs):
     log = LoggerClient.getInstance()
-    log.error(tag, msg, app)
+    log.error(tag, msg, **kwargs)
 
-def write_stream(tag, level_string, stream, app=None):
-    def _process_stream(app, stream):
+def write_stream(tag, level_string, stream, **kwargs):
+    def _process_stream(stream):
         log = LoggerClient.getInstance()
         if level_string not in LoggerClient.__dict__: 
             log.error("LoggerClient", "write_stream failing with unexpected level_string: {}".format(level_string))
             return
         method = log.__getattribute__(level_string)
         for line in iter(stream.readline, ''):
-            method(tag, line, app=app)
-    t = Thread(target=_process_stream, args=(app, stream))
+            method(tag, line, **kwargs)
+    t = Thread(target=_process_stream, args=(stream,))
     t.start()
 
-def get_app_logs(app, start_time):
+def get_app_logs(app, start_time, filtered=False):
     lines = []
     bc = BinderClient("log_reader")
-    rsp = bc.send({"type": "get", "app": app, "since": start_time})
+    rsp = bc.send({ "type": "get", "app": app, "since": start_time, "filtered": filtered })
     if rsp and rsp["type"] == "success":
         lines = rsp["msg"].split("\n")
     else:
@@ -204,12 +206,10 @@ class AppLogStreamer(object):
         # now start reading the subscriber output (starting strictly after last_time)
         while not self._stopped:
             try: 
-                timeout = 0.05
                 line = buf.get_nowait()
                 line_time = time.strptime(LogSettings.EXTRACT_TIME(line), LogSettings.TIME_FORMAT)
                 if not last_time or line_time > last_time:
                     yield line
-                gen.sleep(timeout)
             except Queue.Empty:
                 yield None
         raise StopIteration()

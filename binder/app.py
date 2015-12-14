@@ -162,17 +162,22 @@ class App(object):
         shutil.move(final_df_path, repo_df_path)
 
         # build the app image
+        info_log(self.TAG, "Starting custom Dockerfile build (download logs for more details)",
+                app=self.name)
         try:
             image_name = self._get_image_name().lower()
             cmd = ['docker', 'build', '-t', image_name, "--no-cache", os.path.join(app_img_path, "repo")]
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            write_stream(self.TAG, "info", proc.stdout, app=self.name)
-            write_stream(self.TAG, "error", proc.stderr, app=self.name)
+            write_stream(self.TAG, "info", proc.stdout, app=self.name, no_publish=True)
+            write_stream(self.TAG, "error", proc.stderr, app=self.name, no_publish=True)
             exit_code = proc.wait()
             if exit_code != 0:
                 raise subprocess.CalledProcessError(exit_code, cmd=cmd)
         except subprocess.CalledProcessError as e:
-            raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
+           error_log(self.TAG, "Dockerfile build failed! (download logs for more details)",
+                    app=self.name)
+           raise App.BuildFailedException("could not build app {0}: {1}".format(self.name, e))
+        info_log(self.TAG, "Completed custom Dockerfile build", app=self.name)
 
     def _build_without_dockerfile(self, build_path):
         # construct the app image Dockerfile

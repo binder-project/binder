@@ -7,7 +7,7 @@ import json
 import Queue
 import re
 
-from logging import Handler, FileHandler, StreamHandler, Formatter
+from logging import Handler, FileHandler, StreamHandler, Formatter, Filter
 from threading import Thread
 
 import zmq 
@@ -66,17 +66,24 @@ class LogWriter(BinderDModule):
                     continue
                 except zmq.ZmqError:
                     continue
+
+
+    class PublisherFilter(Filter):
+
+        def filter(self, record):
+            pass
                 
     class PublisherHandler(Handler):
 
-        def __init__(self, topic):
+        def __init__(self):
             super(LogWriter.PublisherHandler, self).__init__()
-            self._topic = topic
 
         def emit(self, record):
-            publisher = LogWriter.PublisherThread.get_instance()
-            msg = self.format(record)
-            publisher.publish(self._topic, msg)
+            topic = record.app
+            if topic:
+                publisher = LogWriter.PublisherThread.get_instance()
+                msg = self.format(record)
+                publisher.publish(topic, msg)
 
     
     def __init__(self):
@@ -91,15 +98,23 @@ class LogWriter(BinderDModule):
         LogWriter.PublisherThread.get_instance().stop()
         self._stopped = True
 
-    def _configure_root_logger(self):
+    def _configure_root_loggers(self):
         make_dir(LogSettings.ROOT_DIRECTORY)
         log_dir = os.path.join(LogSettings.ROOT_DIRECTORY, "root")
         make_dir(log_dir)
 
         logging.basicConfig(format=LogWriter.ROOT_FORMAT)
+
+        # zeromq publishing logger configuration
+        self._stream_logger = logging.getLogger(__name__ + '-stream')
+        self._stream_logger.setLevel(LogSettings.LEVEL)
+        ph = LogWriter.PublisherHandler()
+        ph.setFormatter(Formatter(LogWriter.BINDER_FORMAT))
+        self._stream_logger.addHandler(ph)
+
+        # root logger configuration
         self._root_logger = logging.getLogger(__name__) 
         self._root_logger.propagate = False
-
         self._set_logging_config(log_dir, LogSettings.ROOT_FILE, self._root_logger)
 
     def _set_logging_config(self, log_dir, name, logger):
@@ -113,34 +128,31 @@ class LogWriter(BinderDModule):
         full_fh.setLevel(level)
         full_fh.setFormatter(formatter)
 
-        # stream output config
+        # stdout output config
         sh = StreamHandler(sys.stdout)
         sh.setLevel(level)
         sh.setFormatter(formatter)
 
-        # publisher output config
-        ph = LogWriter.PublisherHandler(name)
-        ph.setLevel(level)
-        ph.setFormatter(formatter)
-
         logger.addHandler(full_fh)
         logger.addHandler(sh)
-        logger.addHandler(ph)
     
-    def _make_app_logger(self, name):
-        logger = logging.getLogger(name)
-        self._set_logging_config(LogSettings.APPS_DIRECTORY, name, logger)
-        self._app_loggers[name] = logger
-        return logger
+    def _make_app_loggers(self, name):
+        raw = logging.getLogger(name)
+        filtered = logging.getLogger(name + '-filtered')
+        self._set_logging_config(LogSettings.APPS_DIRECTORY, name + '-filtered', filtered)
+        self._set_logging_config(LogSettings.APPS_DIRECTORY, name, raw)
+        loggers = (raw, filtered)
+        self._app_loggers[name] = loggers
+        return loggers
 
     def _configure_app_loggers(self):
         make_dir(LogSettings.APPS_DIRECTORY)
         apps = App.get_app()
         for app in apps:
             if not app.name in self._app_loggers:
-                self._make_app_logger(app.name)
+                self._make_app_loggers(app.name)
 
-    def _get_logger(self, name):
+    def _get_loggers(self, name):
         return self._app_loggers.get(name)
 
     def _initialize(self):
@@ -149,7 +161,7 @@ class LogWriter(BinderDModule):
         self._app_loggers = {}
         self._root_logger = None
 
-        self._configure_root_logger()
+        self._configure_root_loggers()
         self._configure_app_loggers()
 
     def _handle_log(self, msg):
@@ -162,31 +174,26 @@ class LogWriter(BinderDModule):
         try:
             result_msg = "message not logged"
             level = int(level)
-            extra = {'tag': tag}
             if app: 
-                logger = self._get_logger(app)
-                if not logger:
-                    logger = self._make_app_logger(app)
-                extra['app'] = app
+                loggers = self._get_loggers(app)
+                if not loggers: 
+                    raw_logger, filtered_logger = self._make_app_loggers(app)
+                else:
+                    raw_logger, filtered_logger = loggers
             else:
-                logger = self._root_logger
+                filtered_logger = None
+                raw_logger = self._root_logger
             if level and string:
                 m = LogWriter.COLOR_RE.search(string)
                 if m:
                     start, stop = m.span()
                     string = string[:start] + string[stop:]
-                if level == logging.DEBUG:
-                    result_msg = "message logged as debug"
-                    logger.debug(string, extra=extra)  
-                elif level == logging.INFO:
-                    result_msg = "message logged as info"
-                    logger.info(string, extra=extra)  
-                elif level == logging.WARNING:
-                    result_msg = "message logged as warning" 
-                    logger.warning(string, extra=extra)  
-                elif level == logging.ERROR:
-                    result_msg = "message logged as error"
-                    logger.error(string, extra=extra)  
+                result_msg = "message logged as {0}".format(level)
+                del msg['msg']
+                raw_logger.log(level, string, extra=msg)
+                if not msg.get('no_publish'):
+                    filtered_logger.log(level, string, extra=msg)
+                    self._stream_logger.log(level, string, extra=msg)
         except Exception as e:
             return self._error_msg("logging error: {}".format(e))
         return self._success_msg(result_msg)
