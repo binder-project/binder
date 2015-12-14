@@ -100,7 +100,7 @@ class App(object):
             repo_path = os.path.join(self.dir, "repo")
             if requests.get(self.repo_url).status_code == 404:
                 raise Exception("repository does not exist")
-            cmd = ['git', 'clone', self.repo_url, repo_path]
+            cmd = ['git', 'clone', '--recursive', self.repo_url, repo_path]
             if os.path.isdir(repo_path):
                 shutil.rmtree(repo_path)
             subprocess.check_call(cmd)

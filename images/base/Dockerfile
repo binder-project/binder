@@ -41,9 +41,9 @@ RUN wget https://3230d63b5fc54e62148e-c95ac804525aac4b6dba79b00b39d1d3.ssl.cf1.r
 RUN bash Anaconda-2.3.0-Linux-x86_64.sh -b &&\
     rm Anaconda-2.3.0-Linux-x86_64.sh
 ENV PATH $HOME/anaconda/bin:$PATH
-RUN conda create -n python3 python=3.3 anaconda
+RUN conda create -n python3 python=3.4 anaconda
 RUN /bin/bash -c "source activate python3 && ipython kernelspec install-self --user"
 
-RUN /home/main/anaconda/bin/pip install --upgrade setuptools pip
+RUN /home/main/anaconda/bin/pip install --upgrade pip
 
 ENV SHELL /bin/bash
