@@ -25,7 +25,7 @@ class LogWriter(BinderDModule):
     ROOT_FORMAT = "%(asctime)s %(levelname)s: - %(message)s"
     BINDER_FORMAT = "%(asctime)s %(levelname)s: - %(tag)s: %(message)s"
 
-    COLOR_RE = re.compile(r'\[\d+m')
+    COLOR_RE = re.compile(r'\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]')
 
     class PublisherThread(Thread):
 

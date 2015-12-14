@@ -193,7 +193,7 @@ class AppLogStreamer(object):
         self._pubsub_cb = _insert_msg
         PubSubStreamer.get_instance().add_app_callback(self._app, self._pubsub_cb)
             
-        lines = get_app_logs(self._app, self._start_time)
+        lines = get_app_logs(self._app, self._start_time, filtered=True)
 
         # exhaust all lines from the get request
         last_time = None
