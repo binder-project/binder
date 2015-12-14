@@ -33,7 +33,8 @@ class LogWriter(BinderDModule):
 
         @staticmethod
         def get_instance():
-            if not LogWriter.PublisherThread._singleton: 
+            singleton = LogWriter.PublisherThread._singleton
+            if not singleton or not singleton.is_alive(): 
                 LogWriter.PublisherThread._singleton = LogWriter.PublisherThread()
                 LogWriter.PublisherThread._singleton.start()
             return LogWriter.PublisherThread._singleton 
@@ -58,19 +59,24 @@ class LogWriter(BinderDModule):
     
         def run(self):
             while not self._stopped:
-                topic, msg = self._queue.get()
-                self._pub_sock.send_multipart([bytes(topic), bytes(msg)]) 
+                try:
+                    topic, msg = self._queue.get_nowait()
+                    self._pub_sock.send_multipart([bytes(topic), bytes(msg)], flags=zmq.NOBLOCK) 
+                except Queue.Empty:
+                    continue
+                except zmq.ZmqError:
+                    continue
                 
     class PublisherHandler(Handler):
 
         def __init__(self, topic):
             super(LogWriter.PublisherHandler, self).__init__()
-            self._publisher = LogWriter.PublisherThread.get_instance()
             self._topic = topic
 
         def emit(self, record):
+            publisher = LogWriter.PublisherThread.get_instance()
             msg = self.format(record)
-            self._publisher.publish(self._topic, msg)
+            publisher.publish(self._topic, msg)
 
     
     def __init__(self):

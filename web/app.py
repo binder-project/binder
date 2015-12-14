@@ -223,8 +223,6 @@ class LiveLogsHandler(WebSocketHandler):
             self._handler = handler
             self._stopped = False
 
-            self._ioloop = IOLoop.instance()
-
         def stop(self):
             self._stopped = True
 
@@ -233,13 +231,14 @@ class LiveLogsHandler(WebSocketHandler):
             time_string = datetime.datetime.strftime(app.last_build_time, LogSettings.TIME_FORMAT)
             self._stream = AppLogStreamer(self._app_name, time_string).get_stream()
             while not self._stopped:
-                time.sleep(0.05)
+                time.sleep(0.10)
                 try: 
                     msg = self._stream.next()
                     if msg:
-                        self._ioloop.add_callback(self._handler.write_message, msg)
+                        IOLoop.instance().add_callback(self._handler.write_message, msg)
                 except StopIteration:
                     self.stop()
+            ws_handlers.remove(self._handler)
                 
     def __init__(self, application, request, **kwargs):
         super(LiveLogsHandler, self).__init__(application, request, **kwargs)
@@ -248,7 +247,6 @@ class LiveLogsHandler(WebSocketHandler):
     def stop(self):
         if self._thread:
             self._thread.stop()
-            ws_handlers.remove(self)
 
     def check_origin(self, origin):
         return True
@@ -269,6 +267,8 @@ class LiveLogsHandler(WebSocketHandler):
     def on_close(self):
         super(LiveLogsHandler, self).on_close()
         self.stop()
+        if self._thread:
+            self._thread.join()
 
 def sig_handler(sig, frame):
     IOLoop.instance().add_callback(shutdown)

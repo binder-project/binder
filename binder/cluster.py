@@ -86,7 +86,7 @@ class KubernetesManager(ClusterManager):
                 cmd.append('--namespace={0}'.format(namespace))
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError as e:
-            msg = "Could not deploy specification: {0} on Kubernetes cluster: {1}".format(path, e)
+            msg = "Could not deploy specification: {0} on Kubernetes cluster: {1}".format(filename, e)
             error_log(self.TAG, msg)
             success = False
         return success
@@ -284,8 +284,22 @@ class KubernetesManager(ClusterManager):
             error_log(self.TAG, e)
             return None
 
-    def _nodes_command(self, func):
+    def _nodes_command(self, func, shell=False):
         provider = os.environ["KUBERNETES_PROVIDER"]
+
+        if isinstance(func, str):
+            func_str = func
+            def _func(node, zone):
+                split = node.split()
+                if len(split) > 0:
+                    node_name = split[0]
+                    if node_name != "kubernetes-master":
+                        info_log(self.TAG, "Running {0} on {1}...".format(func, node_name))
+                        cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
+                               "--command", "{}".format(func_str)]
+                        return subprocess.Popen(cmd, shell=shell)
+                return None
+            func = _func
 
         if provider == 'gce':
 

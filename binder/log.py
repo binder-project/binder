@@ -39,7 +39,7 @@ class LoggerClient(Thread):
         self._client.send(msg)
 
     def run(self):
-        while not self._stopped and self.parent.is_alive():
+        while not self._stopped:
             self._send_message()
         # keep logging until the queue is empty, even after the parent has died
         while not self._queue.empty():
@@ -71,7 +71,7 @@ def info_log(tag, msg, app=None):
 
 def warning_log(tag, msg, app=None):
     log = LoggerClient.getInstance()
-    log.warning(tag, msg, app)
+    log.warn(tag, msg, app)
 
 def error_log(tag, msg, app=None):
     log = LoggerClient.getInstance()
@@ -93,7 +93,7 @@ def get_app_logs(app, start_time):
     lines = []
     bc = BinderClient("log_reader")
     rsp = bc.send({"type": "get", "app": app, "since": start_time})
-    if rsp["type"] == "success":
+    if rsp and rsp["type"] == "success":
         lines = rsp["msg"].split("\n")
     else:
         error_log("LoggerClient", "read_stream failure for app {}: {}".format(app, rsp))

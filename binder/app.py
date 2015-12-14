@@ -138,7 +138,7 @@ class App(object):
                 no_from = filter(lambda line: filter_from(line), lines)
 
                 # write the actual base image (with corrected registry)
-                final_lines = ["FROM {}".format(self._get_base_image_name())] + no_from
+                final_lines = ["FROM {}\n".format(self._get_base_image_name())] + no_from
 
                 for line in final_lines:
                     final_df.write(line)
