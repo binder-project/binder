@@ -1,7 +1,6 @@
 # Base image of the IPython/Jupyter notebook, with conda
 # Intended to be used in a tmpnb installation
-# Customized from https://github.com/jupyter/docker-demo-images/tree/master/common
-
+# Customized from https://github.com/jupyter/docker-demo-images/tree/master/common 
 FROM debian:jessie
 
 MAINTAINER Andrew Osheroff <andrewosh@gmail.com>
@@ -26,7 +25,8 @@ ENV SHELL /bin/bash
 ENV USER main
 WORKDIR $HOME
 
-# Add helper script
+# Add helper scripts
+ADD handle-requirements.py /home/main/
 ADD start-notebook.sh /home/main/
 ADD templates/ /srv/templates/
 
@@ -37,13 +37,13 @@ RUN chown -R main:main /home/main
 USER main
 
 # Install Anaconda and Jupyter
-RUN wget https://3230d63b5fc54e62148e-c95ac804525aac4b6dba79b00b39d1d3.ssl.cf1.rackcdn.com/Anaconda-2.3.0-Linux-x86_64.sh
-RUN bash Anaconda-2.3.0-Linux-x86_64.sh -b &&\
-    rm Anaconda-2.3.0-Linux-x86_64.sh
-ENV PATH $HOME/anaconda/bin:$PATH
+RUN wget https://3230d63b5fc54e62148e-c95ac804525aac4b6dba79b00b39d1d3.ssl.cf1.rackcdn.com/Anaconda2-2.4.1-Linux-x86_64.sh
+RUN bash Anaconda2-2.4.1-Linux-x86_64.sh -b &&\
+    rm Anaconda2-2.4.1-Linux-x86_64.sh
+ENV PATH $HOME/anaconda2/bin:$PATH
 RUN conda create -n python3 python=3.4 anaconda
 RUN /bin/bash -c "source activate python3 && ipython kernelspec install-self --user"
 
-RUN /home/main/anaconda/bin/pip install --upgrade pip
+RUN /home/main/anaconda2/bin/pip install --upgrade pip
 
 ENV SHELL /bin/bash
