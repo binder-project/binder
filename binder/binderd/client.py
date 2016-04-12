@@ -45,7 +45,7 @@ class BinderClient(object):
             pass
         else:
             # using MDP module to send to service
-            res = mdp_request(self._sock, bytes(self.name), [bytes(msg),], 2.0)
+            res = mdp_request(self._sock, bytes(self.name), [bytes(msg),], 10)
             # the first element in the list is the service name
             return json.loads(res[1]) if res else None
 

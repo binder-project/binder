@@ -9,7 +9,7 @@ import multiprocessing
 from binder.app import App
 from binder.utils import make_dir
 
-NUM_WORKERS = 16
+NUM_WORKERS = 5
 GET_TIMEOUT = 2
 LOG_DIR = "/home/andrew/logs/binder"
 

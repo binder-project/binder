@@ -3,7 +3,7 @@ import subprocess
 
 if __name__ == "__main__":
     commands = [["pip", "install", "-r", "requirements.txt"],
-                ["/home/main/anaconda/envs/python3/bin/pip", "install", "-r", "requirements.txt"]]
+                ["/home/main/anaconda2/envs/python3/bin/pip", "install", "-r", "requirements.txt"]]
     errors = 0
     for cmd in commands:
         try:

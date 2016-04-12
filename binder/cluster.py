@@ -20,7 +20,7 @@ from binder.log import *
 class ClusterManager(object):
 
     TAG = "ClusterManager"
-    CLUSTER_HOST = "app.mybinder.org"
+    CLUSTER_HOST = "app.mybinder.org:80"
 
     # the singleton manager
     manager = None
@@ -353,7 +353,7 @@ class KubernetesManager(ClusterManager):
                 node_name = split[0]
                 if node_name != "kubernetes-master":
                     info_log(self.TAG, "Preloading {0} onto {1}...".format(image_name, node_name))
-                    docker_cmd = "sudo docker pull {0}/{1}".format(MainSettings.REGISTRY_NAME, image_name)
+                    docker_cmd = "sudo gcloud docker pull {0}/{1}".format(MainSettings.REGISTRY_NAME, image_name)
                     cmd = ["gcloud", "compute", "ssh", node_name, "--zone", zone,
                            "--command", "{}".format(docker_cmd)]
                     return subprocess.Popen(cmd)
@@ -499,7 +499,7 @@ class KubernetesManager(ClusterManager):
             return None
 
         lookup_url = self._get_lookup_url()
-        app_url = urljoin("http://" + lookup_url, app_id)
+        app_url = urljoin("https://" + lookup_url, app_id)
         info_log(self.TAG, "Access app at: \n   {}".format(app_url))
         return app_url
 
@@ -507,12 +507,12 @@ class KubernetesManager(ClusterManager):
         if app_id == "kube-system":
             return 
         try:
+            self._remove_proxy_route(app_id)
             stop_cmd = ["kubectl.sh", "stop", "pods,services,replicationControllers", "--all",
                    "--namespace={}".format(app_id)]
             cleanup_cmd = ["kubectl.sh", "delete", "namespace", app_id]
             subprocess.check_call(stop_cmd)
             subprocess.check_call(cleanup_cmd)
-            self._remove_proxy_route(app_id)
             info_log(self.TAG, "Stopped app {}".format(app_id))
         except subprocess.CalledProcessError as e:
             error_log(self.TAG, "Could not stop app {}".format(app_id))

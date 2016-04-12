@@ -11,7 +11,8 @@
     "containers": [
     {
       "name": "notebook-server",
-      "image": "{{app.notebooks-image}}",
+      "imagePullPolicy": "Always",
+      "image": "{{app.notebooks-image}}:latest",
       "ports": [
         {
           "containerPort": {{app.notebooks-port}}

@@ -132,9 +132,19 @@ class MongoAppIndex(FileAppIndex):
 
     def update_build_state(self, app, state):
         super(MongoAppIndex, self).update_build_state(app, state)
+        query = {"app": app.name}
+        update = {"$set": {"state": state}}
+        self._apps.update_one(query, update, upsert=True)
 
     def get_build_state(self, app):
         return super(MongoAppIndex, self).get_build_state(app)
+        query = {"app": app.name }
+        projection = ["state"]
+        res = self._apps.find_one(query, projection=projection)
+        if not res:
+            return None
+        state = res["state"]
+        return state
 
     def update_last_build_time(self, app, time=None):
         if not time:

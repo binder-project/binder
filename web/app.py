@@ -23,7 +23,7 @@ from .builder import Builder
 
 # TODO move settings into a config file
 PORT = 8080
-NUM_WORKERS = 10
+NUM_WORKERS = 5
 PRELOAD = True
 QUEUE_SIZE = 50
 ALLOW_ORIGIN = True
@@ -36,7 +36,7 @@ class BinderHandler(RequestHandler):
 
     def __init__(self, request, application, **kwargs):
         super(BinderHandler, self).__init__(request, application, **kwargs)
-        self.executor = ThreadPoolExecutor(max_workers=10)
+        self.executor = ThreadPoolExecutor(max_workers=NUM_WORKERS)
 
     def get(self):
         if ALLOW_ORIGIN:
@@ -68,12 +68,18 @@ class BuildHandler(BinderHandler):
         # by default, there aren't any required fields in an app specification
         pass
 
+    @concurrent.run_on_executor
+    def _get_build_state(self, app):
+        return app.build_state
+
+    @gen.coroutine
     def _write_build_state(self, app):
-        if app.build_state == App.BuildState.BUILDING:
+        build_state = yield self._get_build_state(app)
+        if build_state == App.BuildState.BUILDING:
             self.write({"build_status": "building"})
-        elif app.build_state == App.BuildState.FAILED:
+        elif build_state == App.BuildState.FAILED:
             self.write({"build_status": "failed"})
-        elif app.build_state == App.BuildState.COMPLETED:
+        elif build_state == App.BuildState.COMPLETED:
              self.write({"build_status": "completed"})
         else:
             self.write({"build_status": "unknown"})
@@ -97,7 +103,7 @@ class GithubStatusHandler(GithubHandler):
             self.set_status(404)
             self.write({"error": "app does not exist"})
         else:
-            self._write_build_state(app)
+            yield self._write_build_state(app)
 
 
 class GithubBuildHandler(GithubHandler):
@@ -109,9 +115,14 @@ class GithubBuildHandler(GithubHandler):
         super(GithubHandler, self).get()
         app_name = App.make_app_name(organization, repo)
         app = yield self._get_app(app_name)
-        if app and app.build_state == App.BuildState.COMPLETED:
-            redirect_url = yield self._deploy_app(app, "single-node")
-            self.write({"redirect_url": redirect_url})
+        if app:
+            build_state = yield self._get_build_state(app)
+            if build_state == App.BuildState.COMPLETED:
+                redirect_url = yield self._deploy_app(app, "single-node")
+                self.write({"redirect_url": redirect_url})
+            else:
+                self.set_status(422)
+                self.write({"error": "app is ready for deployment - please rebuild"})
         else:
             self.set_status(404)
             self.write({"error": "no app available to deploy"})
@@ -190,10 +201,10 @@ class CapacityHandler(BinderHandler):
         running = len(cm.get_running_apps()) - 3
         if not self.last_poll or not self.cached_capacity or\
                 time.time() - self.last_poll > CapacityHandler.POLL_PERIOD:
-            capacity = yield self._get_capacity(cm)
-            CapacityHandler.cached_capacity = capacity
+            # capacity = yield self._get_capacity(cm)
+            # CapacityHandler.cached_capacity = capacity
             CapacityHandler.last_poll = time.time()
-        self.write({"capacity": self.cached_capacity, "running": running})
+        self.write({"capacity": 700, "running": running})
 
 class StaticLogsHandler(BinderHandler):
 
@@ -295,12 +306,13 @@ def main():
         (r"/capacity", CapacityHandler)
     ], debug=False)
 
+    http_server = HTTPServer(application)
+    http_server.bind(PORT)
+    http_server.start(0)
+
     global builder
     builder = Builder(build_queue, PRELOAD)
     builder.start()
-
-    http_server = HTTPServer(application)
-    http_server.listen(PORT)
 
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
