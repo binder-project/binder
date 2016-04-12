@@ -37,12 +37,12 @@ RUN chown -R main:main /home/main
 USER main
 
 # Install Anaconda and Jupyter
-RUN wget http://repo.continuum.io/archive/Anaconda2-2.5.0-Linux-x86_64.sh
-RUN bash Anaconda2-2.5.0-Linux-x86_64.sh -b &&\
-    rm Anaconda2-2.5.0-Linux-x86_64.sh
+RUN wget https://3230d63b5fc54e62148e-c95ac804525aac4b6dba79b00b39d1d3.ssl.cf1.rackcdn.com/Anaconda2-4.0.0-Linux-x86_64.sh
+RUN bash Anaconda2-4.0.0-Linux-x86_64.sh -b &&\
+    rm Anaconda2-4.0.0-Linux-x86_64.sh
 ENV PATH $HOME/anaconda2/bin:$PATH
-RUN conda create -n python3 python=3.4 anaconda
-RUN /bin/bash -c "source activate python3 && ipython kernelspec install-self --user"
+RUN conda create -n python3 python=3.5 anaconda
+RUN /bin/bash -c "source activate python3 && ipython kernel install --user"
 
 RUN /home/main/anaconda2/bin/pip install --upgrade pip
 
