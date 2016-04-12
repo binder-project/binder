@@ -1,7 +1,6 @@
 # Base image of the IPython/Jupyter notebook, with conda
 # Intended to be used in a tmpnb installation
-# Customized from https://github.com/jupyter/docker-demo-images/tree/master/common
-
+# Customized from https://github.com/jupyter/docker-demo-images/tree/master/common 
 FROM debian:jessie
 
 MAINTAINER Andrew Osheroff <andrewosh@gmail.com>
@@ -26,7 +25,8 @@ ENV SHELL /bin/bash
 ENV USER main
 WORKDIR $HOME
 
-# Add helper script
+# Add helper scripts
+ADD handle-requirements.py /home/main/
 ADD start-notebook.sh /home/main/
 ADD templates/ /srv/templates/
 
