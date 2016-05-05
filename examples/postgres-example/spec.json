@@ -1,8 +1,0 @@
-{
-  "services": [
-    {
-      "name": "postgres",
-      "version": "9.4"
-    }
-  ]
-}
