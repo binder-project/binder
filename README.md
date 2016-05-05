@@ -1,47 +1,47 @@
-# Binder
+# binder
 
-[![Join the chat at https://gitter.im/binder-project/binder](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/binder-project/binder?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+> reproducible executable environments
 
-A system for deploying a collection of Jupyter notebooks and their dependencies as live, interactive notebooks, straight from GitHub repositories, across one or more nodes of a Kubernetes cluster. 
+[![chatroom](https://img.shields.io/gitter/room/binder-project/binder.svg?style=flat-square)](https://gitter.im/binder-project/binder)
 
-See discussion on the [Jupyter mailing list](https://groups.google.com/forum/#!topic/jupyter/2DjI5sZa8tI).
+Binder is a collection of tools for building and executing version-controlled computational environments that contain code, data, and interactive front ends, like [Jupyter](http://jupyter.org) notebooks. It's 100% open source. We maintain a small cluster for public use, but it's also easy to deploy the system yourself. 
 
-Live demo at http://mybinder.org. Still under very active development! Definitely reach out if you'd like to get involved, take a look at the current issues for contribution ideas.
+This repository does not contain any actual code, but serves as a reference for Binder information, and a place to post issues or questions about the project. A legacy version, written in Python, can be found on the [`legacy`](https://github.com/binder-project/binder/tree/legacy) branch.
 
-### Goals
-- Provide "one-click" deployment straight from a GitHub repo to interactive Jupyter notebooks
-- Support a variety of custom dependencies with simple configuration
-- Support custom external services, like databases 
-- Focused on the reproducibility of science and analytics
+See [`docs.mybinder.org`](http://docs.mybinder.org) for official documentation.
 
-### Overview
+### concept
 
-A typical deployment works like this. 
+At a high level, Binder is designed to make the following workflow as easy as possible
 
-A user provides a GitHub repo, services, and dependencies at http://mybinder.org. Given that info, we build and upload docker images for core notebook dependencies and all required services (if not already built). This can take a few minutes, but only needs to happen once per repo. It will need to be repeated if the repo is updated, but the modularity of our images will make this process faster.
+- Users specify a GitHub repository
+- Repository contents are used to build [Docker](http://docker.com) images
+- Deploy containers on-demand in the browser on a cluster running [Kubernetes](http://kubernetes.io)
 
-The above step results in a link to an endpoint (of the form `http://mybinder.org/repo/user/project`) that will populate template files for both services and notebooks, and launch the images associated with the binder on a cluster using Kubernetes
+Common use cases include:
+- sharing scientific work
+- sharing journalism
+- running tutorials and demos with minimal setup
+- teaching courses
 
-### Concepts
-- `services` : Modular, versioned components that can be configured and added to an app, e.g. databases, Spark, etc. Services are allowed to have client-specific code that can be inserted into the notebook image at build time
+### components
 
-- `notebooks`: This is the main entrypoint and includes Jupyter notebooks and simple dependencies that don't require separate services (e.g. `requirements.txt` for `pip` installable dependencies)
+Binder is implemented through a collection of NodeJS modules, each of which can be independently tested and versioned. The key components are:
 
-- `binder` : A combination of notebooks and services in a single, deployable app
+- [`binder-build`](https://github.com/binder-project/binder-build) build Docker images from repository contents
+- [`binder-deploy-kubernetes`](https://github.com/binder-project/binder-deploy-kubernetes) deploy images on a Kubernetes cluster
+- [`binder-control`](https://github.com/binder-project/binder-control) CLI for setting up binder components for a deployment
+- [`binder-client`](https://github.com/binder-project/binder-client) CLI and library for interacting with a binder deployment
+- [`binder-web`](https://github.com/binder-project/binder-web) web frontend for a Binder deployment
 
-### Components
-- `templates` : Parameterizable JSON that specifies the building blocks of a binder
+### for users
 
-- `proxy` : Maintains and registers routes to apps deployed on a cluster
+We maintain a public Binder cluster at [`mybinder.org`](http://mybinder.org) running on Google Compute Engine, supported by [HHMI Janelia Research Center](https://janelia.org), and designed for open source and open science projects. You just need to specify a GitHub repository, and you'll get a badge to embed in your project README that launches the environment. Head to [`mybinder.org`](http://mybinder.org) to try it out.
 
-- `services` : Services that are independent of particular apps and configurable, for example, databases, Spark, etc.
+### for developers
 
-- `binder` : Core utilities and CLI for building, managing, and deploying binders
+We've also made it easy to setup a custom Binder deployment on your own compute infrastructure. This is a great idea if you need guarenteed availability (e.g. for a course), want to use an existing compute cluster, or need access to private data. It's also a great way to understand the system and start contributing new features! See the `devs` section of [`docs.mybinder.org`](http://docs.mybinder.org) to get started.
 
+### contributing
 
-
-
-
-
-
-
+We welcome community contributions! You can submit issues or pull requests to the repository for the component you're interested in working on, e.g. if you have an idea for improving how dependencies are resolved, open an issue on [`binder-build`](https://github.com/binder-project/binder-build). But if you're unsure, you can just open an issue on this repository.
