@@ -1,6 +1,0 @@
-#!/bin/bash
-# TODO get docker-squash to work more reliably across machines
-
-#docker save $1 | sudo docker-squash -t $1-squashed | docker load
-#docker tag -f $1-squashed $1
-gcloud docker push $1

@@ -1,7 +1,0 @@
-#!/bin/bash
-echo "PYTHONPATH: " $PYTHONPATH
-echo "PATH: " $PATH
-source /home/andrew/.bashrc
-echo "PYTHONPATH: " $PYTHONPATH
-echo "PATH: " $PATH
-/home/andrew/binder/bin/binder stop app --inactive-since 60
