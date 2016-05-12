@@ -6,7 +6,7 @@
 
 Binder is a collection of tools for building and executing version-controlled computational environments that contain code, data, and interactive front ends, like [Jupyter](http://jupyter.org) notebooks. It's 100% open source. We maintain a small cluster for public use, but it's also easy to deploy the system yourself. 
 
-This repository does not contain any actual code, but serves as a reference for Binder information, and a place to post issues or questions about the project. All Binder components are written in `node.js`, but a legacy version written in `python` can be found on the [`legacy`](https://github.com/binder-project/binder/tree/legacy) branch of this repository.
+This repository does not contain any actual code, but serves as a reference for Binder information, and a place to post issues or questions about the project. All Binder components are written in `node.js` but an earlier version written in `python` can be found on the [`legacy`](https://github.com/binder-project/binder/tree/legacy) branch of this repository.
 
 See [`docs.mybinder.org`](http://docs.mybinder.org) for official documentation.
 
